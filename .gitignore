@@ -1,0 +1,7 @@
+build
+out
+grayscale_train
+mnist
+.cache
+.atl
+compile_commands.json
