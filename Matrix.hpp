@@ -26,4 +26,16 @@ struct Matrix {
           result.at(i, j) += at(i, k) * other.at(k, j);
     return result;
   }
+
+  Matrix T() const {
+    Matrix result(cols, rows);
+
+    for (size_t i = 0; i < rows; i++)
+      for (size_t j = 0; j < cols; j++)
+        result.at(j, i) = at(i, j);
+
+    return result;
+  }
+
+
 };
