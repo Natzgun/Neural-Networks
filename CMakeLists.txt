@@ -1,10 +1,20 @@
 cmake_minimum_required(VERSION 3.15)
 project(neural_networks)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 add_executable(mlp mlp.cpp)
+
+target_sources(mlp PRIVATE
+    mlp.cpp
+    Matrix.h
+    ActivationFunction.hpp
+    Layer.hpp
+    MLP.hpp
+)
 
 add_custom_command(
     TARGET mlp POST_BUILD
