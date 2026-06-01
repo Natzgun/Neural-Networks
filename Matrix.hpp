@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <iterator>
 #include <vector>
 #include <cassert>
 
@@ -52,6 +53,36 @@ struct Matrix {
     for (size_t i = 0; i < rows * cols; i++)
       r.data[i] = data[i] - o.data[i];
     return r;
+  }
+
+  // Hadamard
+  Matrix operator*(const Matrix &o) const {
+    assert(rows == o.rows && cols == o.cols);
+    Matrix r(rows, cols);
+    for (size_t i = 0; i < rows * cols; i++)
+      r.data[i] = data[i] * o.data[i];
+    return r;
+  }
+
+  // Matrix-scalar product
+  Matrix operator*(float s) const {
+    Matrix r(rows, cols);
+    for (size_t i = 0; i < rows * cols; i++)
+      r.data[i] = data[i] * s;
+    return r;
+  }
+
+  Matrix operator/(float s) const {
+    Matrix r(rows, cols);
+    for (size_t i = 0; i < rows * cols; i++)
+      r.data[i] = data[i] * s;
+    return r;
+  }
+
+  Matrix& operator-=(const Matrix &o) {
+    for (size_t i = 0; i < rows * cols; i++)
+      data[i] -= o.data[i];
+    return *this;
   }
 
 };
