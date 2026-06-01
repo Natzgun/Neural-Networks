@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <vector>
 #include <cassert>
 
@@ -37,5 +38,20 @@ struct Matrix {
     return result;
   }
 
+  Matrix operator+(const Matrix &o) const {
+    assert(rows == o.rows && cols == o.cols);
+    Matrix r(rows, cols);
+    for (size_t i = 0; i < rows * cols; i++)
+      r.data[i] = data[i] + o.data[i];
+    return r;
+  }
+
+  Matrix operator-(const Matrix &o) const {
+    assert(rows == o.rows && cols == o.cols);
+    Matrix r(rows, cols);
+    for (size_t i = 0; i < rows * cols; i++)
+      r.data[i] = data[i] - o.data[i];
+    return r;
+  }
 
 };
