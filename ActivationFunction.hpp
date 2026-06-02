@@ -42,3 +42,40 @@ public:
   }
 
 };
+
+class ReLU : public ActivationFunction {
+public:
+  Matrix forward(const Matrix &x) override {
+    Matrix result(x.rows, x.cols);
+    for (size_t i = 0; i< x.rows * x.cols; i++)
+      result.data[i] = std::max(0.0f, x.data[i]);
+    return result;
+  }
+
+  Matrix derivative(const Matrix &output) override {
+    Matrix result(output.rows, output.cols);
+    for (size_t i = 0; i< output.rows * output.cols; i++)
+      result.data[i] = output.data[i] > 0.0f ? 1.0f : 0.0f;
+    return result;
+  }
+};
+
+
+class Sigmoid : public ActivationFunction {
+public:
+  Matrix forward(const Matrix &x) override {
+    Matrix result(x.rows, x.cols);
+    for (size_t i = 0; i< x.rows * x.cols; i++) {
+      float val = std::max(-250.0f, std::min(250.0f, x.data[i]));
+      result.data[i] = 1.0f / (1.0f + std::exp(-val));
+    }
+    return result;
+  }
+
+  Matrix derivative(const Matrix &output) override {
+    Matrix result(output.rows, output.cols);
+    for (size_t i = 0; i< output.rows * output.cols; i++)
+      result.data[i] = output.data[i] * (1.0f - output.data[i]);
+    return result;
+  }
+};
