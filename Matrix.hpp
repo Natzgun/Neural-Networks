@@ -1,9 +1,10 @@
 #pragma once
 
 #include <cstddef>
-#include <iterator>
 #include <vector>
 #include <cassert>
+#include <random>
+#include <iostream>
 
 struct Matrix {
   std::vector<float> data;
@@ -83,6 +84,26 @@ struct Matrix {
     for (size_t i = 0; i < rows * cols; i++)
       data[i] -= o.data[i];
     return *this;
+  }
+
+  static Matrix random_uniform(int rows, int cols,
+                               float low = -1.0f, float high = 1.0f) {
+    Matrix m(rows, cols);
+    std::mt19937 gen(std::random_device{}());
+    std::uniform_real_distribution<float> dis(low, high);
+    for (auto& x : m.data) x = dis(gen);
+    return m;
+  }
+
+
+  void print(const std::string& name = "") const {
+    if (!name.empty())
+      std::cout << name << " (" << rows << "x" << cols << "):\n";
+    for (int i = 0; i < rows; i++) {
+      for (int j = 0; j < cols; j++)
+        std::cout << at(i,j) << "\t";
+      std::cout << "\n";
+    }
   }
 
 };
