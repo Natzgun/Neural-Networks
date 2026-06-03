@@ -50,7 +50,7 @@ public:
         // Cross entropy derivative
         Matrix gradient = (y_pred - batch_Y) / (float)current_batch;
 
-        for (size_t i = layers.size() - 1; i >= 0; i--)
+        for (int i = static_cast<int>(layers.size()) - 1; i >= 0; --i)
           gradient = layers[i].backward(gradient, lr);
       }
 

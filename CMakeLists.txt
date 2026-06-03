@@ -6,10 +6,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
-add_executable(mlp mlp.cpp)
+add_executable(mlp main.cpp)
 
 target_sources(mlp PRIVATE
-    mlp.cpp
+    # mlp.cpp
     Matrix.hpp
     ActivationFunction.hpp
     Layer.hpp

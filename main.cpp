@@ -1,0 +1,94 @@
+#include <iostream>
+#include <iomanip>
+#include "MLP.hpp"
+#include "ActivationFunction.hpp"
+#include "Matrix.hpp"
+
+
+struct EvalResult {
+  float accuracy;
+  std::vector<int> pred_classes;
+  std::vector<int> true_classes;
+  std::vector<float> confidences;
+};
+
+EvalResult evaluate(MLP& network,
+                    const Matrix& X,
+                    const Matrix& Y,
+                    const std::string& split_name = "Test",
+                    int n_show = 10) {
+
+  Matrix y_pred = network.forward(X);
+  int n         = X.rows;
+  int n_classes = Y.cols;
+
+  EvalResult result;
+  result.pred_classes.resize(n);
+  result.true_classes.resize(n);
+  result.confidences.resize(n);
+
+  int correct = 0;
+  for (int i = 0; i < n; i++) {
+    int pred_class = 0, true_class = 0;
+    for (int j = 1; j < n_classes; j++) {
+      if (y_pred.at(i,j) > y_pred.at(i,pred_class)) pred_class = j;
+      if (Y.at(i,j)      > Y.at(i,true_class))      true_class = j;
+    }
+    result.pred_classes[i]  = pred_class;
+    result.true_classes[i]  = true_class;
+    result.confidences[i]   = y_pred.at(i, pred_class);
+    if (pred_class == true_class) correct++;
+  }
+  result.accuracy = (float)(correct) / n;
+
+  std::cout << "\n── Predictions " << split_name << " (firsts "
+    << n_show << ") ──────────────────\n";
+  for (int i = 0; i < std::min(n_show, n); i++) {
+    std::string mark = (result.pred_classes[i] == result.true_classes[i]) ? "YES" : "X";
+    std::cout << mark
+      << "  Real Label: [" << result.true_classes[i] << "]"
+      << " -> Prediction: [" << result.pred_classes[i]  << "]"
+      << " (Accuracy: "
+      << std::fixed << std::setprecision(4)
+      << result.confidences[i] << ")\n";
+  }
+
+  std::cout << "\n" << split_name << " Accuracy: "
+    << std::fixed << std::setprecision(4)
+    << result.accuracy << "  ("
+    << correct << "/" << n << ")\n";
+
+  return result;
+}
+
+int main (int argc, char *argv[]) {
+  MLP network;
+
+  network.add_layer(2, 8, new ReLU());
+  network.add_layer(8, 2, new Softmax());
+
+  Matrix X(4, 2);
+  X.data = {
+    0, 0,
+    0, 1,
+    1, 0,
+    1, 1
+  };
+
+  // One hot 4 muestras, 2 clases (0 o 1)
+  Matrix Y(4, 2);
+  Y.data = {
+    1, 0,
+    0, 1,
+    0, 1,
+    1, 0
+  };
+
+  std::cout << "Entrenando XOR...\n";
+  network.train(X, Y, 10, 0.5f, 4);
+
+  EvalResult eval_result = evaluate(network, X, Y, "XOR Test", 4);
+
+
+  return 0;
+}

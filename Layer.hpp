@@ -6,7 +6,7 @@
 class Layer {
 public:
   Layer(int nums_inputs, int num_neurons, ActivationFunction *act) : activation(act) {
-    this->weights = Matrix::random_uniform(nums_inputs, num_neurons);
+    this->weights = Matrix::random_uniform(num_neurons, nums_inputs, -1.0f, 1.0f);
     this->biases = Matrix(1, num_neurons, 0.0f);
   }
 

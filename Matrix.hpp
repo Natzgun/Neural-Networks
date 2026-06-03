@@ -76,7 +76,7 @@ struct Matrix {
   Matrix operator/(float s) const {
     Matrix r(rows, cols);
     for (size_t i = 0; i < rows * cols; i++)
-      r.data[i] = data[i] * s;
+      r.data[i] = data[i] / s;
     return r;
   }
 
@@ -90,7 +90,7 @@ struct Matrix {
     Matrix result(rows, cols);
     for (size_t i = 0; i < rows; i++)
       for (size_t j = 0; j < cols; j++)
-        result.at(j, i) = at(i, j) + bias.at(0, j);
+        result.at(i, j) = at(i, j) + bias.at(0, j);
     return result;
   }
 
