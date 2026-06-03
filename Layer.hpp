@@ -17,7 +17,7 @@ public:
     return outputs;
   }
 
-  Matrix Backward (const Matrix& output_gradients, float lr) {
+  Matrix backward (const Matrix& output_gradients, float lr) {
     Matrix delta = output_gradients * this->activation->derivative(this->outputs);
     Matrix input_grad = delta.matmul(this->weights);
     weights -= delta.T().matmul(this->inputs) * lr;

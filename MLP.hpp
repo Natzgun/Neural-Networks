@@ -45,9 +45,49 @@ public:
             batch_Y.at(i, j) = Y.at(idx, j);
         }
 
+        Matrix y_pred = forward(batch_X);
+
+        // Cross entropy derivative
+        Matrix gradient = (y_pred - batch_Y) / (float)current_batch;
+
+        for (size_t i = layers.size() - 1; i >= 0; i--)
+          gradient = layers[i].backward(gradient, lr);
       }
 
+      Matrix y_pred_all = forward(X);
+      std::cout << "Epoch " << e + 1 << "/" << epochs << ": ";
+      evaluate_sm(n_samples, Y, y_pred_all);
+
     }
+  }
+
+
+  void evaluate_sm(int n_samples, const Matrix &Y, const Matrix &y_pred_all ){
+    // cross- entropy loss
+    float loss = 0.0f;
+    for (size_t i = 0; i < n_samples; i++)
+      for (size_t j = 0; j < Y.cols; j++)
+        loss -= Y.at(i, j) * log(y_pred_all.at(i, j) + 1e-9f);
+
+    loss /= n_samples;
+
+    // Accuracy
+    int correct = 0;
+    for (size_t i = 0; i < n_samples; i++) {
+      int pred_class = 0, true_class = 0;
+      for (size_t j = 1; j < Y.cols; j++) {
+        if (y_pred_all.at(i, j) > y_pred_all.at(i, pred_class))
+          pred_class = 1;
+        if (Y.at(i, j) > Y.at(i, true_class))
+          true_class = 1;
+      }
+      if (pred_class == true_class)
+        correct++;
+    }
+
+    float accuracy = (float)correct / n_samples;
+
+    std::cout << "Loss: " << loss << ", Accuracy: " << accuracy  << "%\n";
   }
 
 private:
