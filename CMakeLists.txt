@@ -10,7 +10,7 @@ add_executable(mlp mlp.cpp)
 
 target_sources(mlp PRIVATE
     mlp.cpp
-    Matrix.h
+    Matrix.hpp
     ActivationFunction.hpp
     Layer.hpp
     MLP.hpp
