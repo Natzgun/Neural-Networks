@@ -77,9 +77,9 @@ public:
       int pred_class = 0, true_class = 0;
       for (size_t j = 1; j < Y.cols; j++) {
         if (y_pred_all.at(i, j) > y_pred_all.at(i, pred_class))
-          pred_class = 1;
+          pred_class = j;
         if (Y.at(i, j) > Y.at(i, true_class))
-          true_class = 1;
+          true_class = j;
       }
       if (pred_class == true_class)
         correct++;
