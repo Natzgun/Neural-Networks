@@ -94,6 +94,14 @@ struct Matrix {
     return result;
   }
 
+  Matrix sum_rows() const {
+    Matrix result(1, cols, 0.0f);
+    for (size_t i = 0; i < rows; i++)
+      for (size_t j = 0; j < cols; j++)
+        result.at(0, j) += at(i, j);
+    return result;
+  }
+
   static Matrix random_uniform(int rows, int cols,
                                float low = -1.0f, float high = 1.0f) {
     Matrix m(rows, cols);
