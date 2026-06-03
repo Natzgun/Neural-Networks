@@ -86,6 +86,14 @@ struct Matrix {
     return *this;
   }
 
+  Matrix add_bias(const Matrix &bias) const {
+    Matrix result(rows, cols);
+    for (size_t i = 0; i < rows; i++)
+      for (size_t j = 0; j < cols; j++)
+        result.at(j, i) = at(i, j) + bias.at(0, j);
+    return result;
+  }
+
   static Matrix random_uniform(int rows, int cols,
                                float low = -1.0f, float high = 1.0f) {
     Matrix m(rows, cols);

@@ -12,7 +12,7 @@ public:
 
   Matrix forward(const Matrix &inputs_) {
     this->inputs = inputs_;
-    Matrix z =  inputs.matmul(this->weights.T());
+    Matrix z =  inputs.matmul(this->weights.T()).add_bias(biases);
     outputs = activation->forward(z);
     return outputs;
   }
