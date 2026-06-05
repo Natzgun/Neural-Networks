@@ -111,6 +111,15 @@ struct Matrix {
     return m;
   }
 
+  static Matrix random_he(int rows, int cols) {
+    Matrix m(rows, cols);
+    std::mt19937 gen(std::random_device{}());
+    float stddev = std::sqrt(2.0f / cols);
+    std::normal_distribution<float> dis(0.0f, stddev);
+    for (auto& x : m.data) x = dis(gen);
+    return m;
+  }
+
 
   void print(const std::string& name = "") const {
     if (!name.empty())

@@ -1,6 +1,7 @@
 build
 out
 grayscale_train
+grayscale_test
 mnist
 .cache
 .atl

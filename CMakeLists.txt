@@ -14,6 +14,7 @@ target_sources(mlp PRIVATE
     ActivationFunction.hpp
     Layer.hpp
     MLP.hpp
+    DatasetLoader.hpp
 )
 
 add_custom_command(
@@ -21,6 +22,13 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             ${CMAKE_SOURCE_DIR}/grayscale_train
             $<TARGET_FILE_DIR:mlp>/grayscale_train
+)
+
+add_custom_command(
+    TARGET mlp POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_SOURCE_DIR}/grayscale_test
+            $<TARGET_FILE_DIR:mlp>/grayscale_test
 )
 
 target_link_libraries(mlp ${OpenCV_LIBS})
