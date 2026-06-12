@@ -4,7 +4,9 @@
 #include <vector>
 #include "MLP.hpp"
 #include "ActivationFunction.hpp"
-#include "Matrix.hpp"
+// #include "Matrix.hpp"
+#include "DeviceMatrix.cuh"
+using Matrix = DeviceMatrix;
 #include "DatasetLoader.hpp"
 
 
@@ -35,6 +37,8 @@ EvalResult evaluate(MLP& network,
                     int n_show = 10) {
 
   Matrix y_pred = network.forward(X);
+  y_pred.download();
+  const_cast<Matrix&>(Y).download();
   int n         = X.rows;
   int n_classes = Y.cols;
 
@@ -115,9 +119,10 @@ int main (int argc, char *argv[]) {
   MLP network;
   network.add_layer(input_size, 256, new ReLU());
   network.add_layer(256, 128, new ReLU());
+  network.add_layer(128, 128, new ReLU());
   network.add_layer(128, n_classes, new Softmax());
 
-  network.train(train_ds.X, train_ds.Y, 100, 0.1f, 64);
+  network.train(train_ds.X, train_ds.Y, 200, 0.1f, 64);
 
   evaluate(network, train_ds.X, train_ds.Y, "Train", 10);
   evaluate(network, test_ds.X, test_ds.Y, "Test", 10);

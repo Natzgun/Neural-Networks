@@ -1,0 +1,14 @@
+CompileFlags:
+  # Strip NVCC-specific flags that clangd (clang) doesn't understand.
+  Remove:
+    - -forward-unknown-to-host-compiler
+    - "--generate-code*"
+    - -x
+    - cu
+  Add:
+    - -std=c++20
+    - --gcc-toolchain=/usr
+    - -I/usr/local/cuda/include
+
+Diagnostics:
+  UnusedIncludes: None

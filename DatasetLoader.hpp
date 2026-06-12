@@ -5,7 +5,10 @@
 #include <vector>
 #include <iostream>
 #include <iomanip>
-#include "Matrix.hpp"
+// #include "Matrix.hpp"
+#include "DeviceMatrix.cuh"
+using Matrix = DeviceMatrix;
+
 #include "MLP.hpp"
 
 struct SimpsonDataset {
@@ -79,5 +82,10 @@ inline SimpsonDataset load_simpson_dataset(const std::string& base_path) {
   ds.X = std::move(X);
   ds.Y = std::move(Y);
   ds.n_samples = n;
+
+  // Upload to GPU
+  ds.X.upload();
+  ds.Y.upload();
+
   return ds;
 }
