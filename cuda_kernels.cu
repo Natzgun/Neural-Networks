@@ -245,3 +245,96 @@ void cuda_softmax_forward(const float *in, float *out, int rows, int cols) {
   softmax_kernel<<<rows, 1>>>(in, out, rows, cols);
   cudaDeviceSynchronize();
 }
+
+// ── im2col / col2im ─────────────────────────────────────────────────────────
+
+__global__ void im2col_kernel(const float *im, float *col,
+                              int N, int C, int H, int W,
+                              int k, int s, int p,
+                              int out_h, int out_w) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  int col_rows = N * out_h * out_w;
+  int col_cols = k * k * C;
+  int total = col_rows * col_cols;
+
+  if (idx >= total) return;
+
+  int row = idx / col_cols;
+  int col_idx = idx % col_cols;
+
+  int n = row / (out_h * out_w);
+  int rem = row % (out_h * out_w);
+  int oh = rem / out_w;
+  int ow = rem % out_w;
+
+  int c = col_idx / (k * k);
+  int rem2 = col_idx % (k * k);
+  int kh = rem2 / k;
+  int kw = rem2 % k;
+
+  int ih = oh * s - p + kh;
+  int iw = ow * s - p + kw;
+
+  // NCHW index
+  int im_idx = ((n * C + c) * H + ih) * W + iw;
+  if (ih >= 0 && ih < H && iw >= 0 && iw < W) {
+    col[idx] = im[im_idx];
+  } else {
+    col[idx] = 0.0f;
+  }
+}
+
+void cuda_im2col(const float *im, float *col,
+                 int N, int C, int H, int W,
+                 int k, int s, int p,
+                 int out_h, int out_w) {
+  int total = N * out_h * out_w * k * k * C;
+  int block = 256;
+  im2col_kernel<<<div_ceil(total, block), block>>>(
+      im, col, N, C, H, W, k, s, p, out_h, out_w);
+  cudaDeviceSynchronize();
+}
+
+__global__ void col2im_kernel(const float *col, float *im,
+                              int N, int C, int H, int W,
+                              int k, int s, int p,
+                              int out_h, int out_w) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  int col_rows = N * out_h * out_w;
+  int col_cols = k * k * C;
+  int total = col_rows * col_cols;
+
+  if (idx >= total) return;
+
+  int row = idx / col_cols;
+  int col_idx = idx % col_cols;
+
+  int n = row / (out_h * out_w);
+  int rem = row % (out_h * out_w);
+  int oh = rem / out_w;
+  int ow = rem % out_w;
+
+  int c = col_idx / (k * k);
+  int rem2 = col_idx % (k * k);
+  int kh = rem2 / k;
+  int kw = rem2 % k;
+
+  int ih = oh * s - p + kh;
+  int iw = ow * s - p + kw;
+
+  if (ih >= 0 && ih < H && iw >= 0 && iw < W) {
+    int im_idx = ((n * C + c) * H + ih) * W + iw;
+    atomicAdd(&im[im_idx], col[idx]);
+  }
+}
+
+void cuda_col2im(const float *col, float *im,
+                 int N, int C, int H, int W,
+                 int k, int s, int p,
+                 int out_h, int out_w) {
+  int total = N * out_h * out_w * k * k * C;
+  int block = 256;
+  col2im_kernel<<<div_ceil(total, block), block>>>(
+      col, im, N, C, H, W, k, s, p, out_h, out_w);
+  cudaDeviceSynchronize();
+}
