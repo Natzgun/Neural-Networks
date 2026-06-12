@@ -37,6 +37,7 @@ public:
         Matrix batch_X(current_batch, X.cols);
         Matrix batch_Y(current_batch, Y.cols);
 
+        // Build batch on host, then upload once
         for (size_t i = 0; i < current_batch; i++) {
           int idx = indices[start + i];
           for (size_t j = 0; j < X.cols; j++)
@@ -44,6 +45,8 @@ public:
           for (size_t j = 0; j < Y.cols; j++)
             batch_Y.at(i, j) = Y.at(idx, j);
         }
+        batch_X.upload();
+        batch_Y.upload();
 
         Matrix y_pred = forward(batch_X);
 
@@ -63,6 +66,10 @@ public:
 
 
   void evaluate_sm(int n_samples, const Matrix &Y, const Matrix &y_pred_all ){
+    // Download predictions to host for metrics
+    const_cast<Matrix&>(y_pred_all).download();
+    const_cast<Matrix&>(Y).download();
+
     // cross- entropy loss
     float loss = 0.0f;
     for (size_t i = 0; i < n_samples; i++)

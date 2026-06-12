@@ -1,6 +1,9 @@
 #pragma once
 
-#include "Matrix.hpp"
+// #include "Matrix.hpp"
+#include "DeviceMatrix.cuh"
+using Matrix = DeviceMatrix;
+
 #include "ActivationFunction.hpp"
 
 class Layer {

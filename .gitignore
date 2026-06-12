@@ -6,3 +6,6 @@ mnist
 .cache
 .atl
 compile_commands.json
+.idea
+cmake-build-debug
+cmake-build-release
