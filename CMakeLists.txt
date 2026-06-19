@@ -8,41 +8,41 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD 20)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
-# RTX 4060 compute capability 8.9
+# RTX 4060 — compute capability 8.9
 set(CMAKE_CUDA_ARCHITECTURES 89)
 
 find_package(OpenCV REQUIRED)
-include_directories(${OpenCV_INCLUDE_DIRS})
 
-set_source_files_properties(main.cpp PROPERTIES LANGUAGE CUDA)
-
-add_executable(mlp
-    main.cpp
-    cuda_kernels.cu
+set(SOURCES
+    src/main.cpp
+    src/Tensor.cu
+    src/nn_ops.cu
+    src/cuda_kernels.cu
 )
 
-target_sources(mlp PRIVATE
-    # mlp.cpp
-    cuda_ops.cuh
-    DeviceMatrix.cuh
-    ActivationFunction.hpp
-    Layer.hpp
-    MLP.hpp
-    DatasetLoader.hpp
+set_source_files_properties(src/main.cpp PROPERTIES LANGUAGE CUDA)
+
+add_executable(neural_networks ${SOURCES})
+
+target_include_directories(neural_networks PRIVATE
+    ${CMAKE_SOURCE_DIR}/includes
+    ${OpenCV_INCLUDE_DIRS}
+)
+
+target_link_libraries(neural_networks PRIVATE
+    ${OpenCV_LIBS}
 )
 
 add_custom_command(
-    TARGET mlp POST_BUILD
+    TARGET neural_networks POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             ${CMAKE_SOURCE_DIR}/grayscale_train
-            $<TARGET_FILE_DIR:mlp>/grayscale_train
+            $<TARGET_FILE_DIR:neural_networks>/grayscale_train
 )
 
 add_custom_command(
-    TARGET mlp POST_BUILD
+    TARGET neural_networks POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             ${CMAKE_SOURCE_DIR}/grayscale_test
-            $<TARGET_FILE_DIR:mlp>/grayscale_test
+            $<TARGET_FILE_DIR:neural_networks>/grayscale_test
 )
-
-target_link_libraries(mlp ${OpenCV_LIBS})
