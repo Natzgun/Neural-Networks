@@ -9,3 +9,6 @@ compile_commands.json
 .idea
 cmake-build-debug
 cmake-build-release
+/datasets
+nn_v1_mlp/build
+nn_v1_mlp/build_cnn
