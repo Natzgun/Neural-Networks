@@ -1,8 +1,13 @@
+#include <algorithm>
+#include <cctype>
+#include <filesystem>
 #include <iostream>
 #include <string>
+#include <system_error>
 #include <vector>
 
-#include <opencv2/opencv.hpp>
+#define STB_IMAGE_IMPLEMENTATION
+#include "vendored/stb_image.h"
 
 #include "core/Tensor.cuh"
 #include "data/Dataset.hpp"
@@ -22,6 +27,30 @@ static std::vector<std::string> class_names() {
     };
 }
 
+static std::string to_lower(std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    return s;
+}
+
+static std::vector<std::string> list_image_files(const std::string& dir_path) {
+    std::vector<std::string> files;
+    std::error_code ec;
+    std::filesystem::directory_iterator it(dir_path, ec);
+    if (ec) {
+        return files;
+    }
+    for (const auto& entry : it) {
+        if (!entry.is_regular_file()) continue;
+        std::string ext = to_lower(entry.path().extension().string());
+        if (ext == ".jpg" || ext == ".jpeg") {
+            files.push_back(entry.path().string());
+        }
+    }
+    std::sort(files.begin(), files.end());
+    return files;
+}
+
 Dataset load_simpsons(const std::string& base_path) {
     auto classes = class_names();
     int n_classes = static_cast<int>(classes.size());
@@ -30,27 +59,28 @@ Dataset load_simpsons(const std::string& base_path) {
     std::vector<int> all_labels;
 
     for (int label = 0; label < n_classes; ++label) {
-        std::string pattern = base_path + "/" + classes[label] + "/*.jpg";
-        std::vector<cv::String> files;
-        cv::glob(pattern, files, false);
+        std::string dir_path = base_path + "/" + classes[label];
+        std::vector<std::string> files = list_image_files(dir_path);
 
         std::cout << "Loading " << files.size() << " images from "
                   << classes[label] << "...\n";
 
         for (const auto& f : files) {
-            cv::Mat img = cv::imread(f, cv::IMREAD_GRAYSCALE);
-            if (img.empty()) {
-                std::cerr << "Warning: could not read " << f << "\n";
+            int w = 0, h = 0, channels = 0;
+            unsigned char* img = stbi_load(f.c_str(), &w, &h, &channels, 1);
+            if (!img) {
+                std::cerr << "Warning: could not read " << f << " ("
+                          << stbi_failure_reason() << ")\n";
                 continue;
             }
 
             std::vector<float> sample;
-            sample.reserve(img.rows * img.cols);
-            for (int i = 0; i < img.rows; ++i) {
-                for (int j = 0; j < img.cols; ++j) {
-                    sample.push_back(static_cast<float>(img.at<uchar>(i, j)) / 255.0f);
-                }
+            sample.reserve(static_cast<size_t>(h) * w);
+            const size_t total = static_cast<size_t>(h) * w;
+            for (size_t i = 0; i < total; ++i) {
+                sample.push_back(static_cast<float>(img[i]) / 255.0f);
             }
+            stbi_image_free(img);
 
             all_samples.push_back(std::move(sample));
             all_labels.push_back(label);

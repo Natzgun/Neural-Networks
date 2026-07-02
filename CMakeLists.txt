@@ -10,8 +10,6 @@ set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
 set(CMAKE_CUDA_ARCHITECTURES 89)
 
-find_package(OpenCV REQUIRED)
-
 set(CORE_SOURCES
     src/core/Tensor.cu
     src/core/ops/linalg.cu
@@ -44,9 +42,4 @@ target_include_directories(neural_networks PRIVATE
     ${CMAKE_SOURCE_DIR}/includes
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/core
-    ${OpenCV_INCLUDE_DIRS}
-)
-
-target_link_libraries(neural_networks PRIVATE
-    ${OpenCV_LIBS}
 )
