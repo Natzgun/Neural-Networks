@@ -1,5 +1,9 @@
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <iostream>
+#include <numeric>
+#include <random>
 #include <vector>
 
 #include "core/Tensor.cuh"
@@ -86,4 +90,35 @@ Metrics evaluate(Network& net, const Dataset& ds) {
     m.accuracy = static_cast<float>(correct) / n;
     m.loss = total_loss / n;
     return m;
+}
+
+void train_epochs(Network& net, Dataset& train, Dataset& test,
+                  int epochs, int batch_size, float lr) {
+    int n = train.n_samples;
+    std::vector<int> indices(n);
+    std::iota(indices.begin(), indices.end(), 0);
+    std::mt19937 gen(std::random_device{}());
+
+    for (int e = 0; e < epochs; ++e) {
+        auto t0 = std::chrono::steady_clock::now();
+        std::shuffle(indices.begin(), indices.end(), gen);
+
+        for (int start = 0; start < n; start += batch_size) {
+            Dataset batch = build_batch(train, indices, start, batch_size);
+            net.train_step(batch.X, batch.Y, lr);
+        }
+
+        Metrics train_m = evaluate(net, train);
+        Metrics test_m = evaluate(net, test);
+
+        auto t1 = std::chrono::steady_clock::now();
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+
+        std::cout << "Epoch " << e + 1 << "/" << epochs
+                  << " | train loss: " << train_m.loss
+                  << " | train acc: " << train_m.accuracy
+                  << " | test loss: " << test_m.loss
+                  << " | test acc: " << test_m.accuracy
+                  << " | time: " << ms << "ms\n";
+    }
 }

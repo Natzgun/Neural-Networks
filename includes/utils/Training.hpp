@@ -15,3 +15,6 @@ Dataset build_batch(const Dataset& ds, const std::vector<int>& indices,
                     int start, int batch_size);
 
 Metrics evaluate(Network& net, const Dataset& ds);
+
+void train_epochs(Network& net, Dataset& train, Dataset& test,
+                  int epochs, int batch_size, float lr);

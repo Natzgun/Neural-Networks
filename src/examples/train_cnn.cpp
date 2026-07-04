@@ -1,13 +1,7 @@
 #include "examples/TrainCnn.hpp"
 
-#include <algorithm>
-#include <chrono>
-#include <cmath>
 #include <iostream>
-#include <numeric>
-#include <random>
 #include <string>
-#include <vector>
 
 #include "core/Tensor.cuh"
 #include "loaders/BloodmnistLoader.hpp"
@@ -50,33 +44,7 @@ int run_cnn_training(int argc, char* argv[]) {
     int batch_size = 8;
     float lr = 0.1f;
 
-    int n = train.n_samples;
-    std::vector<int> indices(n);
-    std::iota(indices.begin(), indices.end(), 0);
-    std::mt19937 gen(std::random_device{}());
-
-    for (int e = 0; e < epochs; ++e) {
-        auto t0 = std::chrono::steady_clock::now();
-        std::shuffle(indices.begin(), indices.end(), gen);
-
-        for (int start = 0; start < n; start += batch_size) {
-            Dataset batch = build_batch(train, indices, start, batch_size);
-            net.train_step(batch.X, batch.Y, lr);
-        }
-
-        Metrics train_m = evaluate(net, train);
-        Metrics test_m = evaluate(net, test);
-
-        auto t1 = std::chrono::steady_clock::now();
-        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
-
-        std::cout << "Epoch " << e + 1 << "/" << epochs
-                  << " | train loss: " << train_m.loss
-                  << " | train acc: " << train_m.accuracy
-                  << " | test loss: " << test_m.loss
-                  << " | test acc: " << test_m.accuracy
-                  << " | time: " << ms << "ms\n";
-    }
+    train_epochs(net, train, test, epochs, batch_size, lr);
 
     return 0;
 }
