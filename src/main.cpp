@@ -9,14 +9,8 @@
 #include "loaders/BloodmnistLoader.hpp"
 #include "loaders/MnistLoader.hpp"
 #include "loaders/SimpsonsLoader.hpp"
+#include "models/CNN.hpp"
 #include "utils/Training.hpp"
-#include "layers/ReLULayer.hpp"
-#include "layers/SoftmaxLayer.hpp"
-#include "layers/conv/ConvLayer.hpp"
-#include "layers/conv/FlattenLayer.hpp"
-#include "layers/conv/MaxPool2DLayer.hpp"
-#include "layers/dense/DenseLayer.hpp"
-#include "network/Network.hpp"
 
 int main(int argc, char* argv[]) {
     Dataset train, test;
@@ -46,18 +40,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Train: " << train.n_samples << ", Test: " << test.n_samples
               << ", channels: " << channels << ", classes: " << n_classes << "\n";
 
-    Network net;
-    net.add<Conv2DLayer>(channels, 16, 3, 1, 1);
-    net.add<ReLULayer>();
-    net.add<MaxPool2DLayer>(2, 2);
-    net.add<Conv2DLayer>(16, 32, 3, 1, 1);
-    net.add<ReLULayer>();
-    net.add<MaxPool2DLayer>(2, 2);
-    net.add<FlattenLayer>();
-    net.add<DenseLayer>(1568, 128);
-    net.add<ReLULayer>();
-    net.add<DenseLayer>(128, n_classes);
-    net.add<SoftmaxLayer>();
+    Network net = make_cnn(channels, n_classes);
 
     int epochs = 5;
     int batch_size = 8;
