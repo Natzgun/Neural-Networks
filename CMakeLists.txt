@@ -35,11 +35,16 @@ set(UTIL_SOURCES
     src/utils/Training.cpp
 )
 
+set(EXAMPLE_SOURCES
+    src/examples/train_cnn.cpp
+)
+
 add_executable(neural_networks
     ${CORE_SOURCES}
     ${LAYER_SOURCES}
     ${NETWORK_SOURCES}
     ${UTIL_SOURCES}
+    ${EXAMPLE_SOURCES}
     src/main.cpp
 )
 
