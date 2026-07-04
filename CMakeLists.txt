@@ -31,10 +31,15 @@ set(NETWORK_SOURCES
     src/network/Network.cpp
 )
 
+set(UTIL_SOURCES
+    src/utils/Training.cpp
+)
+
 add_executable(neural_networks
     ${CORE_SOURCES}
     ${LAYER_SOURCES}
     ${NETWORK_SOURCES}
+    ${UTIL_SOURCES}
     src/main.cpp
 )
 

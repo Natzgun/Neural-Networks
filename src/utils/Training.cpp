@@ -5,11 +5,7 @@
 #include "core/Tensor.cuh"
 #include "data/Dataset.hpp"
 #include "network/Network.hpp"
-
-struct Metrics {
-    float accuracy;
-    float loss;
-};
+#include "utils/Training.hpp"
 
 Dataset build_batch(const Dataset& ds, const std::vector<int>& indices,
                     int start, int batch_size) {

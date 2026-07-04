@@ -6,10 +6,10 @@
 #include <vector>
 
 #include "core/Tensor.cuh"
-#include "loaders/MnistLoader.cpp"
-#include "loaders/SimpsonsLoader.cpp"
-#include "loaders/BloodmnistLoader.cpp"
-#include "utils/Training.cpp"
+#include "loaders/BloodmnistLoader.hpp"
+#include "loaders/MnistLoader.hpp"
+#include "loaders/SimpsonsLoader.hpp"
+#include "utils/Training.hpp"
 #include "layers/ReLULayer.hpp"
 #include "layers/SoftmaxLayer.hpp"
 #include "layers/conv/ConvLayer.hpp"
