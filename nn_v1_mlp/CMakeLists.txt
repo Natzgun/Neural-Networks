@@ -46,3 +46,34 @@ add_custom_command(
 )
 
 target_link_libraries(mlp ${OpenCV_LIBS})
+
+
+add_executable(test_cnn
+    cnn/test_cnn.cpp
+)
+
+target_include_directories(test_cnn PRIVATE
+    ${CMAKE_SOURCE_DIR}
+    ${OpenCV_INCLUDE_DIRS}
+)
+
+set_target_properties(test_cnn PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+)
+
+add_custom_command(
+    TARGET test_cnn POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_SOURCE_DIR}/grayscale_train
+            $<TARGET_FILE_DIR:test_cnn>/grayscale_train
+)
+
+add_custom_command(
+    TARGET test_cnn POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_SOURCE_DIR}/grayscale_test
+            $<TARGET_FILE_DIR:test_cnn>/grayscale_test
+)
+
+target_link_libraries(test_cnn ${OpenCV_LIBS})
