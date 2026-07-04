@@ -1,4 +1,7 @@
+#pragma once
+
 #include <cstdint>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -6,15 +9,15 @@
 #include "core/Tensor.cuh"
 #include "data/Dataset.hpp"
 
-static int32_t read_int32_be(std::ifstream& file) {
+inline int32_t read_int32_be(std::ifstream& file) {
     uint8_t bytes[4];
     file.read(reinterpret_cast<char*>(bytes), 4);
     return static_cast<int32_t>((bytes[0] << 24) | (bytes[1] << 16) |
                                 (bytes[2] << 8) | bytes[3]);
 }
 
-Dataset load_mnist(const std::string& images_path,
-                   const std::string& labels_path) {
+inline Dataset load_mnist(const std::string& images_path,
+                          const std::string& labels_path) {
     std::ifstream img_file(images_path, std::ios::binary);
     std::ifstream lbl_file(labels_path, std::ios::binary);
 

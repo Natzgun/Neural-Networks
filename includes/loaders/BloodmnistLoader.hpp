@@ -1,3 +1,7 @@
+#pragma once
+
+#include <cstdint>
+#include <cstdlib>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -6,7 +10,8 @@
 #include "data/Dataset.hpp"
 #include "libnpy/npy.hpp"
 
-Dataset load_bloodmnist(const std::string& base_path, const std::string& split) {
+inline Dataset load_bloodmnist(const std::string& base_path,
+                               const std::string& split) {
     std::string images_path = base_path + "/" + split + "_images.npy";
     std::string labels_path = base_path + "/" + split + "_labels.npy";
 

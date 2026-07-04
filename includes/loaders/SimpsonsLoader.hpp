@@ -1,18 +1,23 @@
+#pragma once
+
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <string>
 #include <system_error>
 #include <vector>
 
+#ifndef STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
+#endif
 #include "vendored/stb_image.h"
 
 #include "core/Tensor.cuh"
 #include "data/Dataset.hpp"
 
-static std::vector<std::string> class_names() {
+inline std::vector<std::string> simpsons_class_names() {
     return {
         "bart_simpson",
         "charles_montgomery_burns",
@@ -27,13 +32,13 @@ static std::vector<std::string> class_names() {
     };
 }
 
-static std::string to_lower(std::string s) {
+inline std::string simpsons_to_lower(std::string s) {
     std::transform(s.begin(), s.end(), s.begin(),
                    [](unsigned char c) { return std::tolower(c); });
     return s;
 }
 
-static std::vector<std::string> list_image_files(const std::string& dir_path) {
+inline std::vector<std::string> list_simpsons_image_files(const std::string& dir_path) {
     std::vector<std::string> files;
     std::error_code ec;
     std::filesystem::directory_iterator it(dir_path, ec);
@@ -42,7 +47,7 @@ static std::vector<std::string> list_image_files(const std::string& dir_path) {
     }
     for (const auto& entry : it) {
         if (!entry.is_regular_file()) continue;
-        std::string ext = to_lower(entry.path().extension().string());
+        std::string ext = simpsons_to_lower(entry.path().extension().string());
         if (ext == ".jpg" || ext == ".jpeg") {
             files.push_back(entry.path().string());
         }
@@ -51,8 +56,8 @@ static std::vector<std::string> list_image_files(const std::string& dir_path) {
     return files;
 }
 
-Dataset load_simpsons(const std::string& base_path) {
-    auto classes = class_names();
+inline Dataset load_simpsons(const std::string& base_path) {
+    auto classes = simpsons_class_names();
     int n_classes = static_cast<int>(classes.size());
 
     std::vector<std::vector<float>> all_samples;
@@ -60,7 +65,7 @@ Dataset load_simpsons(const std::string& base_path) {
 
     for (int label = 0; label < n_classes; ++label) {
         std::string dir_path = base_path + "/" + classes[label];
-        std::vector<std::string> files = list_image_files(dir_path);
+        std::vector<std::string> files = list_simpsons_image_files(dir_path);
 
         std::cout << "Loading " << files.size() << " images from "
                   << classes[label] << "...\n";
