@@ -1,5 +1,3 @@
-#include "examples/TrainCnn.hpp"
-
 #include <iostream>
 #include <string>
 
@@ -8,6 +6,7 @@
 #include "loaders/MnistLoader.hpp"
 #include "loaders/SimpsonsLoader.hpp"
 #include "models/CNN.hpp"
+#include "utils/ExampleRunners.hpp"
 #include "utils/Training.hpp"
 
 int run_cnn_training(int argc, char* argv[]) {

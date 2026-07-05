@@ -8,7 +8,7 @@
 
 #include "core/Tensor.cuh"
 #include "data/Dataset.hpp"
-#include "libnpy/npy.hpp"
+#include "vendored/libnpy/npy.hpp"
 
 inline Dataset load_bloodmnist(const std::string& base_path,
                                const std::string& split) {
