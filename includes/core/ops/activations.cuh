@@ -12,4 +12,4 @@ Tensor sigmoid_derivative(const Tensor& output);
 
 Tensor softmax_forward(const Tensor& x);
 
-}  // namespace ops
+} // namespace ops

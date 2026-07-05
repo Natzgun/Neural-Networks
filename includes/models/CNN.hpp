@@ -9,17 +9,17 @@
 #include "network/Network.hpp"
 
 inline Network make_cnn(int channels, int n_classes) {
-    Network net;
-    net.add<Conv2DLayer>(channels, 16, 3, 1, 1);
-    net.add<ReLULayer>();
-    net.add<MaxPool2DLayer>(2, 2);
-    net.add<Conv2DLayer>(16, 32, 3, 1, 1);
-    net.add<ReLULayer>();
-    net.add<MaxPool2DLayer>(2, 2);
-    net.add<FlattenLayer>();
-    net.add<DenseLayer>(1568, 128);
-    net.add<ReLULayer>();
-    net.add<DenseLayer>(128, n_classes);
-    net.add<SoftmaxLayer>();
-    return net;
+  Network net;
+  net.add<Conv2DLayer>(channels, 16, 3, 1, 1);
+  net.add<ReLULayer>();
+  net.add<MaxPool2DLayer>(2, 2);
+  net.add<Conv2DLayer>(16, 32, 3, 1, 1);
+  net.add<ReLULayer>();
+  net.add<MaxPool2DLayer>(2, 2);
+  net.add<FlattenLayer>();
+  net.add<DenseLayer>(1568, 128);
+  net.add<ReLULayer>();
+  net.add<DenseLayer>(128, n_classes);
+  net.add<SoftmaxLayer>();
+  return net;
 }

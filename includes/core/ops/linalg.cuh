@@ -30,4 +30,4 @@ Tensor sum_rows(const Tensor& a);
 // Fill a tensor with a scalar value on device.
 void fill(Tensor& a, float val);
 
-}  // namespace ops
+} // namespace ops
