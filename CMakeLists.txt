@@ -27,6 +27,7 @@ set(LAYER_SOURCES
     src/layers/FlattenLayer.cpp
     src/layers/PositionalEmbeddingLayer.cpp
     src/layers/PatchEmbeddingLayer.cpp
+    src/layers/LayerNormLayer.cpp
 )
 
 set(NETWORK_SOURCES
