@@ -12,7 +12,7 @@ static inline void ensure_device(const Tensor& t) {
 
 namespace ops {
 
-Tensor batched_matmul(const Tensor& a, const Tensor& b, bool transpose_b) {
+Tensor batched_matmul(const Tensor& a, const Tensor& b, bool transpose_b, bool transpose_a) {
   ensure_device(a);
   ensure_device(b);
 
@@ -23,8 +23,8 @@ Tensor batched_matmul(const Tensor& a, const Tensor& b, bool transpose_b) {
 
   int batch = a.dim(0);
   int heads = a.dim(1);
-  int M = a.dim(2);
-  int K = a.dim(3);
+  int M = transpose_a ? a.dim(3) : a.dim(2);
+  int K = transpose_a ? a.dim(2) : a.dim(3);
 
   if (b.dim(0) != batch || b.dim(1) != heads) {
     std::cerr << "batched_matmul: batch/heads no coinciden" << std::endl;
@@ -49,7 +49,7 @@ Tensor batched_matmul(const Tensor& a, const Tensor& b, bool transpose_b) {
         for (int j = 0; j < N; ++j) {
           float sum = 0.0f;
           for (int k = 0; k < K; ++k) {
-            float a_val = a.at({bi, h, i, k});
+            float a_val = transpose_a ? a.at({bi, h, k, i}) : a.at({bi, h, i, k});
             float b_val = transpose_b ? b.at({bi, h, j, k}) : b.at({bi, h, k, j});
             sum += a_val * b_val;
           }
