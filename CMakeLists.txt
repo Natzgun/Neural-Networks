@@ -32,6 +32,7 @@ set(LAYER_SOURCES
     src/layers/MultiHeadAttentionLayer.cpp
     src/layers/GELULayer.cpp
     src/layers/TransformerBlock.cpp
+    src/layers/CLSTokenLayer.cpp
 )
 
 set(NETWORK_SOURCES
