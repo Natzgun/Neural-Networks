@@ -10,6 +10,11 @@ Tensor relu_derivative(const Tensor& output);
 Tensor sigmoid_forward(const Tensor& x);
 Tensor sigmoid_derivative(const Tensor& output);
 
+// A diferencia de relu/sigmoid, la derivada de GELU no se puede expresar solo
+// en funcion de la salida: necesita la entrada x tal cual.
+Tensor gelu_forward(const Tensor& x);
+Tensor gelu_derivative(const Tensor& x);
+
 Tensor softmax_forward(const Tensor& x);
 
 // Backward real de softmax (vector-Jacobiano), por fila:
