@@ -33,6 +33,7 @@ set(LAYER_SOURCES
     src/layers/GELULayer.cpp
     src/layers/TransformerBlock.cpp
     src/layers/CLSTokenLayer.cpp
+    src/layers/ExtractCLSLayer.cpp
 )
 
 set(NETWORK_SOURCES
