@@ -16,6 +16,7 @@ set(CORE_SOURCES
     src/core/ops/activations.cu
     src/core/ops/conv_ops.cu
     src/core/ops/pool_ops.cu
+    src/core/ops/attention_ops.cu
 )
 
 set(LAYER_SOURCES
