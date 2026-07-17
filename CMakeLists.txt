@@ -98,3 +98,16 @@ target_include_directories(test_batched_matmul PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/core
 )
+
+add_executable(test_attention
+    ${CORE_SOURCES}
+    ${LAYER_SOURCES}
+    ${NETWORK_SOURCES}
+    src/examples/test_attention.cpp
+)
+
+target_include_directories(test_attention PRIVATE
+    ${CMAKE_SOURCE_DIR}/includes
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/core
+)
