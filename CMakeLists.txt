@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.24)
 project(neural_networks LANGUAGES CXX CUDA)
 
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -allow-unsupported-compiler")
@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD 20)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
-set(CMAKE_CUDA_ARCHITECTURES 89)
+set(CMAKE_CUDA_ARCHITECTURES native)
 
 set(CORE_SOURCES
     src/core/Tensor.cu
