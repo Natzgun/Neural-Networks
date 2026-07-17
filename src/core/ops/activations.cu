@@ -37,6 +37,24 @@ __global__ void sigmoid_derivative_kernel(const float* output, float* out, int n
     out[idx] = output[idx] * (1.0f - output[idx]);
 }
 
+__global__ void gelu_forward_kernel(const float* in, float* out, int n) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < n) {
+    float x = in[idx];
+    out[idx] = 0.5f * x * (1.0f + erff(x * 0.70710678f)); // 1/sqrt(2)
+  }
+}
+
+__global__ void gelu_derivative_kernel(const float* in, float* out, int n) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < n) {
+    float x = in[idx];
+    float cdf = 0.5f * (1.0f + erff(x * 0.70710678f));
+    float pdf = expf(-0.5f * x * x) * 0.3989422804f; // 1/sqrt(2*pi)
+    out[idx] = cdf + x * pdf;
+  }
+}
+
 __global__ void softmax_kernel(const float* in, float* out, int rows, int cols) {
   int row = blockIdx.x;
   if (row >= rows)
@@ -100,6 +118,28 @@ Tensor sigmoid_derivative(const Tensor& output) {
   r.upload();
   int n = output.numel();
   sigmoid_derivative_kernel<<<div_ceil(n, 256), 256>>>(output.device_ptr(), r.device_ptr(), n);
+  CUDA_CHECK(cudaGetLastError());
+  CUDA_CHECK(cudaDeviceSynchronize());
+  return r;
+}
+
+Tensor gelu_forward(const Tensor& x) {
+  ensure_device(x);
+  Tensor r(x.sizes());
+  r.upload();
+  int n = x.numel();
+  gelu_forward_kernel<<<div_ceil(n, 256), 256>>>(x.device_ptr(), r.device_ptr(), n);
+  CUDA_CHECK(cudaGetLastError());
+  CUDA_CHECK(cudaDeviceSynchronize());
+  return r;
+}
+
+Tensor gelu_derivative(const Tensor& x) {
+  ensure_device(x);
+  Tensor r(x.sizes());
+  r.upload();
+  int n = x.numel();
+  gelu_derivative_kernel<<<div_ceil(n, 256), 256>>>(x.device_ptr(), r.device_ptr(), n);
   CUDA_CHECK(cudaGetLastError());
   CUDA_CHECK(cudaDeviceSynchronize());
   return r;

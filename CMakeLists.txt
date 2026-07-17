@@ -30,6 +30,8 @@ set(LAYER_SOURCES
     src/layers/PatchEmbeddingLayer.cpp
     src/layers/LayerNormLayer.cpp
     src/layers/MultiHeadAttentionLayer.cpp
+    src/layers/GELULayer.cpp
+    src/layers/TransformerBlock.cpp
 )
 
 set(NETWORK_SOURCES
