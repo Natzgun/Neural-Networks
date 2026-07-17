@@ -123,4 +123,36 @@ Tensor softmax_forward(const Tensor& x) {
   return r;
 }
 
+Tensor softmax_backward(const Tensor& grad_output, const Tensor& softmax_output) {
+  ensure_device(grad_output);
+  ensure_device(softmax_output);
+  if (grad_output.ndim() != 2 || softmax_output.ndim() != 2) {
+    std::cerr << "softmax_backward requires 2D tensors" << std::endl;
+    std::exit(EXIT_FAILURE);
+  }
+
+  int rows = grad_output.dim(0);
+  int cols = grad_output.dim(1);
+
+  // Host-side por ahora (sin kernel CUDA todavia).
+  grad_output.download();
+  softmax_output.download();
+
+  Tensor dx({rows, cols});
+  for (int r = 0; r < rows; ++r) {
+    float dot = 0.0f;
+    for (int c = 0; c < cols; ++c)
+      dot += grad_output.at({r, c}) * softmax_output.at({r, c});
+
+    for (int c = 0; c < cols; ++c) {
+      float g = grad_output.at({r, c});
+      float s = softmax_output.at({r, c});
+      dx.at({r, c}) = s * (g - dot);
+    }
+  }
+
+  dx.upload();
+  return dx;
+}
+
 } // namespace ops
