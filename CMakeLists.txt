@@ -113,3 +113,16 @@ target_include_directories(test_attention PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/core
 )
+
+add_executable(test_transformer_block
+    ${CORE_SOURCES}
+    ${LAYER_SOURCES}
+    ${NETWORK_SOURCES}
+    src/examples/test_transformer_block.cpp
+)
+
+target_include_directories(test_transformer_block PRIVATE
+    ${CMAKE_SOURCE_DIR}/includes
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/core
+)
