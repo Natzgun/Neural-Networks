@@ -27,6 +27,7 @@ set(LAYER_SOURCES
     src/layers/FlattenLayer.cpp
     src/layers/PositionalEmbeddingLayer.cpp
     src/layers/PatchEmbeddingLayer.cpp
+    src/layers/LayerNormLayer.cpp
 )
 
 set(NETWORK_SOURCES
@@ -56,7 +57,7 @@ target_include_directories(neural_networks PRIVATE
     ${CMAKE_SOURCE_DIR}/src/core
 )
 
-# Prueba suelta para verificar shapes de PatchEmbeddingLayer (no va al PR final).
+# Pruebas sueltas para verificar shapes/valores de capas nuevas (no van al PR final).
 add_executable(test_patch_embedding
     ${CORE_SOURCES}
     ${LAYER_SOURCES}
@@ -65,6 +66,19 @@ add_executable(test_patch_embedding
 )
 
 target_include_directories(test_patch_embedding PRIVATE
+    ${CMAKE_SOURCE_DIR}/includes
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/core
+)
+
+add_executable(test_layer_norm
+    ${CORE_SOURCES}
+    ${LAYER_SOURCES}
+    ${NETWORK_SOURCES}
+    src/examples/test_layer_norm.cpp
+)
+
+target_include_directories(test_layer_norm PRIVATE
     ${CMAKE_SOURCE_DIR}/includes
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/core
