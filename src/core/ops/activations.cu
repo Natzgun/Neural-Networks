@@ -37,6 +37,24 @@ __global__ void sigmoid_derivative_kernel(const float* output, float* out, int n
     out[idx] = output[idx] * (1.0f - output[idx]);
 }
 
+__global__ void gelu_forward_kernel(const float* in, float* out, int n) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < n) {
+    float x = in[idx];
+    out[idx] = 0.5f * x * (1.0f + erff(x * 0.70710678f)); // 1/sqrt(2)
+  }
+}
+
+__global__ void gelu_derivative_kernel(const float* in, float* out, int n) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < n) {
+    float x = in[idx];
+    float cdf = 0.5f * (1.0f + erff(x * 0.70710678f));
+    float pdf = expf(-0.5f * x * x) * 0.3989422804f; // 1/sqrt(2*pi)
+    out[idx] = cdf + x * pdf;
+  }
+}
+
 __global__ void softmax_kernel(const float* in, float* out, int rows, int cols) {
   int row = blockIdx.x;
   if (row >= rows)
@@ -105,6 +123,28 @@ Tensor sigmoid_derivative(const Tensor& output) {
   return r;
 }
 
+Tensor gelu_forward(const Tensor& x) {
+  ensure_device(x);
+  Tensor r(x.sizes());
+  r.upload();
+  int n = x.numel();
+  gelu_forward_kernel<<<div_ceil(n, 256), 256>>>(x.device_ptr(), r.device_ptr(), n);
+  CUDA_CHECK(cudaGetLastError());
+  CUDA_CHECK(cudaDeviceSynchronize());
+  return r;
+}
+
+Tensor gelu_derivative(const Tensor& x) {
+  ensure_device(x);
+  Tensor r(x.sizes());
+  r.upload();
+  int n = x.numel();
+  gelu_derivative_kernel<<<div_ceil(n, 256), 256>>>(x.device_ptr(), r.device_ptr(), n);
+  CUDA_CHECK(cudaGetLastError());
+  CUDA_CHECK(cudaDeviceSynchronize());
+  return r;
+}
+
 Tensor softmax_forward(const Tensor& x) {
   ensure_device(x);
   if (x.ndim() != 2) {
@@ -121,6 +161,38 @@ Tensor softmax_forward(const Tensor& x) {
   CUDA_CHECK(cudaGetLastError());
   CUDA_CHECK(cudaDeviceSynchronize());
   return r;
+}
+
+Tensor softmax_backward(const Tensor& grad_output, const Tensor& softmax_output) {
+  ensure_device(grad_output);
+  ensure_device(softmax_output);
+  if (grad_output.ndim() != 2 || softmax_output.ndim() != 2) {
+    std::cerr << "softmax_backward requires 2D tensors" << std::endl;
+    std::exit(EXIT_FAILURE);
+  }
+
+  int rows = grad_output.dim(0);
+  int cols = grad_output.dim(1);
+
+  // Host-side por ahora (sin kernel CUDA todavia).
+  grad_output.download();
+  softmax_output.download();
+
+  Tensor dx({rows, cols});
+  for (int r = 0; r < rows; ++r) {
+    float dot = 0.0f;
+    for (int c = 0; c < cols; ++c)
+      dot += grad_output.at({r, c}) * softmax_output.at({r, c});
+
+    for (int c = 0; c < cols; ++c) {
+      float g = grad_output.at({r, c});
+      float s = softmax_output.at({r, c});
+      dx.at({r, c}) = s * (g - dot);
+    }
+  }
+
+  dx.upload();
+  return dx;
 }
 
 } // namespace ops
