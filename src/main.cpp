@@ -10,7 +10,12 @@ int main(int argc, char* argv[]) {
     return run_cnn_training(argc - 1, argv + 1);
   }
 
-  if (example == "mnist" || example == "simpsons" || example == "bloodmnist") {
+  if (example == "vit" || example == "train_vit") {
+    return run_vit_training(argc - 1, argv + 1);
+  }
+
+  if (example == "mnist" || example == "simpsons" || example == "bloodmnist" ||
+      example == "fashionmnist") {
     return run_cnn_training(argc, argv);
   }
 

@@ -46,6 +46,7 @@ set(UTIL_SOURCES
 
 set(EXAMPLE_SOURCES
     src/examples/train_cnn.cpp
+    src/examples/train_vit.cpp
 )
 
 add_executable(neural_networks
