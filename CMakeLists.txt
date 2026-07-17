@@ -29,6 +29,7 @@ set(LAYER_SOURCES
     src/layers/PositionalEmbeddingLayer.cpp
     src/layers/PatchEmbeddingLayer.cpp
     src/layers/LayerNormLayer.cpp
+    src/layers/MultiHeadAttentionLayer.cpp
 )
 
 set(NETWORK_SOURCES
