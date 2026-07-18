@@ -3,6 +3,7 @@
 #include <string>
 
 #include "core/Tensor.cuh"
+#include "loaders/FashionMnistLoader.hpp"
 #include "loaders/MnistLoader.hpp"
 #include "models/ViT.hpp"
 #include "utils/ExampleRunners.hpp"
@@ -30,6 +31,11 @@ int run_vit_training(int argc, char* argv[]) {
                        "datasets/mnist/train-labels.idx1-ubyte");
     test = load_mnist("datasets/mnist/t10k-images.idx3-ubyte",
                       "datasets/mnist/t10k-labels.idx1-ubyte");
+  } else if (dataset == "fashionmnist") {
+    train = load_fashionmnist("datasets/fashionmnist/train-images-idx3-ubyte",
+                              "datasets/fashionmnist/train-labels-idx1-ubyte");
+    test = load_fashionmnist("datasets/fashionmnist/t10k-images-idx3-ubyte",
+                             "datasets/fashionmnist/t10k-labels-idx1-ubyte");
   } else {
     std::cerr << "Unknown ViT dataset: " << dataset << "\n";
     std::cerr << "Usage: neural_networks vit [fashionmnist|mnist] [epochs] [batch_size]\n";

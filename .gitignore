@@ -10,5 +10,7 @@ compile_commands.json
 cmake-build-debug
 cmake-build-release
 /datasets
+*.zip
+*:Zone.Identifier
 nn_v1_mlp/build
 nn_v1_mlp/build_cnn
