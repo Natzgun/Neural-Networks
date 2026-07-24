@@ -77,6 +77,28 @@ __global__ void softmax_kernel(const float* in, float* out, int rows, int cols) 
     row_out[j] /= sum;
 }
 
+// dot = sum(grad_output * softmax_output) es el mismo escalar para las N
+// columnas de la fila, asi que se necesita una primera pasada completa
+// antes de poder escribir cualquier dx[c] (no se puede fusionar en un solo
+// paso como en relu/sigmoid).
+__global__ void softmax_backward_kernel(const float* grad_out, const float* softmax_out,
+                                        float* dx, int rows, int cols) {
+  int row = blockIdx.x;
+  if (row >= rows)
+    return;
+
+  const float* g = grad_out + row * cols;
+  const float* s = softmax_out + row * cols;
+  float* d = dx + row * cols;
+
+  float dot = 0.0f;
+  for (int c = 0; c < cols; c++)
+    dot += g[c] * s[c];
+
+  for (int c = 0; c < cols; c++)
+    d[c] = s[c] * (g[c] - dot);
+}
+
 namespace ops {
 
 Tensor relu_forward(const Tensor& x) {
@@ -174,24 +196,13 @@ Tensor softmax_backward(const Tensor& grad_output, const Tensor& softmax_output)
   int rows = grad_output.dim(0);
   int cols = grad_output.dim(1);
 
-  // Host-side por ahora (sin kernel CUDA todavia).
-  grad_output.download();
-  softmax_output.download();
-
   Tensor dx({rows, cols});
-  for (int r = 0; r < rows; ++r) {
-    float dot = 0.0f;
-    for (int c = 0; c < cols; ++c)
-      dot += grad_output.at({r, c}) * softmax_output.at({r, c});
-
-    for (int c = 0; c < cols; ++c) {
-      float g = grad_output.at({r, c});
-      float s = softmax_output.at({r, c});
-      dx.at({r, c}) = s * (g - dot);
-    }
-  }
-
   dx.upload();
+
+  softmax_backward_kernel<<<rows, 1>>>(grad_output.device_ptr(), softmax_output.device_ptr(),
+                                       dx.device_ptr(), rows, cols);
+  CUDA_CHECK(cudaGetLastError());
+  CUDA_CHECK(cudaDeviceSynchronize());
   return dx;
 }
 
