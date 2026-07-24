@@ -14,35 +14,15 @@ MultiHeadAttentionLayer::MultiHeadAttentionLayer(int embed_dim, int num_heads)
 
 Tensor MultiHeadAttentionLayer::split_heads(const Tensor& x, int batch, int tokens) const {
   // {batch, tokens, embed_dim} -> {batch, tokens, heads, head_dim} (reshape,
-  // gratis) -> {batch, heads, tokens, head_dim} (permute, host-side).
+  // gratis) -> {batch, heads, tokens, head_dim} (swap de ejes, en GPU).
   Tensor reshaped = x.reshape({batch, tokens, num_heads_, head_dim_});
-  reshaped.download();
-
-  Tensor out({batch, num_heads_, tokens, head_dim_});
-  for (int b = 0; b < batch; ++b)
-    for (int h = 0; h < num_heads_; ++h)
-      for (int n = 0; n < tokens; ++n)
-        for (int d = 0; d < head_dim_; ++d)
-          out.at({b, h, n, d}) = reshaped.at({b, n, h, d});
-
-  out.upload();
-  return out;
+  return ops::swap_middle_axes(reshaped);
 }
 
 Tensor MultiHeadAttentionLayer::combine_heads(const Tensor& x, int batch, int tokens) const {
-  // Inverso de split_heads.
-  x.download();
-
-  Tensor merged({batch, tokens, num_heads_, head_dim_});
-  for (int b = 0; b < batch; ++b)
-    for (int h = 0; h < num_heads_; ++h)
-      for (int n = 0; n < tokens; ++n)
-        for (int d = 0; d < head_dim_; ++d)
-          merged.at({b, n, h, d}) = x.at({b, h, n, d});
-
-  Tensor out = merged.reshape({batch, tokens, embed_dim_});
-  out.upload();
-  return out;
+  // Inverso de split_heads: mismo swap (es su propia inversa).
+  Tensor merged = ops::swap_middle_axes(x);
+  return merged.reshape({batch, tokens, embed_dim_});
 }
 
 Tensor MultiHeadAttentionLayer::forward(const Tensor& input) {

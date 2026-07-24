@@ -13,10 +13,13 @@ namespace ops {
 //
 // Ninguna transposicion se materializa: solo cambia como se leen los indices.
 // Salida: {batch, heads, M, N}
-//
-// Implementacion host-side por ahora (sin kernel CUDA todavia); candidato a
-// optimizar despues.
 Tensor batched_matmul(const Tensor& a, const Tensor& b, bool transpose_b = false,
                      bool transpose_a = false);
+
+// Intercambia los ejes 1 y 2 de un tensor 4D contiguo: {d0, d1, d2, d3} ->
+// {d0, d2, d1, d3}. Es su propia inversa (aplicarla dos veces devuelve el
+// tensor original), por eso split_heads y combine_heads en
+// MultiHeadAttentionLayer llaman a la misma funcion.
+Tensor swap_middle_axes(const Tensor& x);
 
 } // namespace ops
