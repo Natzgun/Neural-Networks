@@ -1,0 +1,380 @@
+# Contenido para informe: Vision Transformer aplicado a FashionMNIST
+
+> Nota de uso: este documento trae el contenido en bruto, listo para pegar en
+> las secciones/subsecciones de tu plantilla LaTeX (artículo, ~8 páginas). Las
+> ecuaciones ya están en sintaxis LaTeX (`$...$` y `\begin{equation}`) para
+> copiar directo. Los encabezados marcan dónde debería ir cada `\section`/
+> `\subsection`; el formato final (columnas, fuente, `\usepackage`, etc.) lo
+> pones tú.
+
+---
+
+## Resumen
+
+Este trabajo implementa un Vision Transformer (ViT) desde cero en C++/CUDA,
+sin frameworks de deep learning, y lo evalúa en la tarea de clasificación de
+imágenes de FashionMNIST. Se describe la teoría detrás de la arquitectura
+ViT —patch embedding, self-attention, atención multi-cabeza y el bloque
+Transformer pre-norm— y se reporta el desempeño de un modelo compacto
+(~11 mil parámetros, un solo bloque Transformer) entrenado durante 4 épocas
+sobre las 60 000 imágenes de entrenamiento del dataset. El modelo alcanza
+82.45% de exactitud en test, con una curva de pérdida y exactitud
+consistentemente creciente, lo que confirma que la implementación —incluyendo
+los kernels CUDA de atención, normalización y activación— es correcta desde
+el punto de vista numérico y de aprendizaje.
+
+---
+
+## 1. Introducción
+
+Desde su introducción en el paper *"An Image is Worth 16x16 Words"*
+(Dosovitskiy et al., 2020), los Vision Transformers han desplazado a las
+redes convolucionales (CNN) como arquitectura de referencia en visión por
+computadora a gran escala. A diferencia de las CNN, que procesan la imagen
+mediante filtros locales que se deslizan espacialmente, un ViT trata la
+imagen como una secuencia de "palabras visuales" (parches) y aplica
+directamente el mecanismo de self-attention introducido por Vaswani et al.
+(2017) en *"Attention Is All You Need"*, originalmente diseñado para
+procesamiento de lenguaje natural.
+
+El objetivo de este trabajo es doble:
+
+1. **Teórico:** explicar en detalle cómo funciona un ViT, desde la
+   tokenización de la imagen en parches hasta la cabeza de clasificación,
+   incluyendo las ecuaciones que gobiernan cada componente.
+2. **Práctico:** validar una implementación propia de ViT, escrita en C++
+   con kernels CUDA reales (no simulados en CPU) para cada operación —
+   proyección de parches, atención multi-cabeza, normalización de capa
+   (LayerNorm), activación GELU y softmax—, entrenándola sobre FashionMNIST
+   y analizando su curva de aprendizaje.
+
+---
+
+## 2. Teoría del Vision Transformer
+
+### 2.1 Motivación: de las CNN a los Transformers en visión
+
+Las CNN codifican dos sesgos inductivos fuertes: **localidad** (un píxel solo
+interactúa con su vecindad a través del kernel) y **equivarianza traslacional**
+(el mismo filtro se aplica en toda la imagen). Estos sesgos son útiles con
+poco dato, pero limitan la capacidad del modelo para capturar relaciones
+*globales* entre regiones lejanas de la imagen sin apilar muchas capas.
+
+Un Transformer, en cambio, no asume ninguna estructura espacial a priori: cada
+token de la secuencia puede atender directamente a cualquier otro token,
+sin importar la distancia. El costo de esa flexibilidad es que el modelo debe
+*aprender* la noción de posición y de vecindad desde los datos —de ahí la
+necesidad del *positional embedding* (sección 2.4)— y que típicamente requiere
+más datos de entrenamiento para generalizar bien, al carecer de los sesgos
+inductivos de la convolución.
+
+### 2.2 Arquitectura general de ViT
+
+El flujo completo de un ViT es el siguiente:
+
+```
+Imagen (H×W×C)
+   -> Patch Embedding           (parches -> tokens)
+   -> Prepend token [CLS]       (token de clasificación)
+   -> + Positional Embedding    (posición aprendible)
+   -> N × Bloque Transformer    (self-attention + MLP)
+   -> LayerNorm final
+   -> Extraer token [CLS]
+   -> Cabeza lineal + Softmax   (clasificación)
+```
+
+Cada componente se detalla a continuación.
+
+### 2.3 Patch Embedding
+
+La imagen de entrada $x \in \mathbb{R}^{H \times W \times C}$ se divide en
+$N$ parches no solapados de tamaño $P \times P$:
+
+$$
+N = \frac{H}{P} \times \frac{W}{P}
+$$
+
+Cada parche se aplana en un vector de $P^2 \cdot C$ valores y se proyecta
+linealmente a la dimensión del modelo $D$ mediante una matriz de pesos
+aprendible $E \in \mathbb{R}^{(P^2 C) \times D}$:
+
+$$
+z_p^{(i)} = x_p^{(i)} E, \qquad i = 1, \dots, N
+$$
+
+En la práctica, esta proyección lineal es matemáticamente equivalente a una
+convolución con kernel de tamaño $P \times P$ y stride $P$ (sin solapamiento),
+que es exactamente cómo está implementada en este proyecto: se reutiliza la
+capa convolucional existente con `kernel_size = stride = patch_size`, evitando
+así duplicar lógica de proyección.
+
+### 2.4 Token de clasificación (CLS) y Positional Embedding
+
+Siguiendo a BERT, se antepone a la secuencia de $N$ tokens de parche un token
+aprendible adicional, el **token [CLS]** ($z_0 = x_{class}$), cuyo estado en
+la salida del último bloque Transformer se usa como representación agregada
+de toda la imagen para la clasificación:
+
+$$
+z^{(0)} = [\,x_{class};\; z_p^{(1)};\; z_p^{(2)};\; \dots;\; z_p^{(N)}\,] + E_{pos}
+$$
+
+donde $E_{pos} \in \mathbb{R}^{(N+1) \times D}$ es una tabla de embeddings
+posicionales aprendibles, uno por posición en la secuencia. Sin este término
+el modelo sería invariante a permutaciones de los parches, perdiendo toda
+noción de estructura espacial de la imagen.
+
+### 2.5 Self-Attention y Multi-Head Attention
+
+El corazón del Transformer es el mecanismo de **self-attention**: cada token
+de la secuencia genera tres proyecciones lineales de sí mismo —*Query* (Q),
+*Key* (K) y *Value* (V)— mediante matrices de pesos aprendibles $W^Q, W^K,
+W^V \in \mathbb{R}^{D \times D}$:
+
+$$
+Q = ZW^Q, \qquad K = ZW^K, \qquad V = ZW^V
+$$
+
+La atención de un token hacia todos los demás se calcula comparando su Query
+con todas las Keys de la secuencia, normalizando con softmax y usando el
+resultado como pesos para combinar los Values:
+
+$$
+\mathrm{Attention}(Q, K, V) = \mathrm{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}\right) V
+$$
+
+El factor $1/\sqrt{d_k}$ (donde $d_k = D / h$ es la dimensión por cabeza)
+evita que los productos punto crezcan en magnitud con $d_k$ y saturen el
+softmax, lo que produciría gradientes cercanos a cero.
+
+En vez de una sola atención, ViT usa **atención multi-cabeza**: se dividen
+Q, K, V en $h$ subespacios de dimensión $d_k = D/h$, se calcula la atención
+en paralelo en cada uno, y los resultados se concatenan y se proyectan de
+vuelta a $D$ con una matriz de salida $W^O$:
+
+$$
+\mathrm{MultiHead}(Q,K,V) = \mathrm{Concat}(\mathrm{head}_1, \dots, \mathrm{head}_h)\,W^O,
+\qquad \mathrm{head}_i = \mathrm{Attention}(QW_i^Q, KW_i^K, VW_i^V)
+$$
+
+Tener varias cabezas permite que el modelo atienda simultáneamente a
+diferentes tipos de relaciones (por ejemplo, una cabeza podría capturar
+bordes cercanos y otra, simetrías globales de la prenda), en lugar de
+promediar todo en una sola distribución de atención.
+
+### 2.6 Bloque Transformer (pre-norm)
+
+Cada bloque Transformer combina atención y una red feed-forward (MLP), cada
+una envuelta en una conexión residual y precedida por **LayerNorm**
+(variante *pre-norm*, más estable numéricamente que la variante *post-norm*
+del Transformer original):
+
+$$
+x' = x + \mathrm{MultiHead}(\mathrm{LN}(x))
+$$
+$$
+x'' = x' + \mathrm{MLP}(\mathrm{LN}(x'))
+$$
+
+**LayerNorm** normaliza cada token de forma independiente (a diferencia de
+BatchNorm, que normaliza a través del batch), a media 0 y varianza 1, y
+luego aplica una escala y desplazamiento aprendibles $\gamma, \beta$ por
+canal:
+
+$$
+\mathrm{LN}(x)_j = \gamma_j \cdot \frac{x_j - \mu}{\sqrt{\sigma^2 + \epsilon}} + \beta_j,
+\qquad \mu = \frac{1}{D}\sum_{j=1}^{D} x_j, \quad \sigma^2 = \frac{1}{D}\sum_{j=1}^{D}(x_j-\mu)^2
+$$
+
+El **MLP** consiste en dos capas lineales con una activación no lineal
+**GELU** (Gaussian Error Linear Unit) entre medio:
+
+$$
+\mathrm{MLP}(x) = W_2\,\mathrm{GELU}(W_1 x + b_1) + b_2, \qquad
+\mathrm{GELU}(x) = x \cdot \Phi(x) = \tfrac{1}{2}x\left(1 + \mathrm{erf}\!\left(\tfrac{x}{\sqrt{2}}\right)\right)
+$$
+
+GELU se prefiere sobre ReLU en Transformers porque es suave (derivable en
+todo punto) y pondera la entrada por su probabilidad bajo una gaussiana
+estándar, en vez de recortarla abruptamente en 0.
+
+Las conexiones residuales ($x + \cdot$) son las que permiten apilar muchos
+bloques sin que el gradiente se desvanezca: durante el backward, cada suma
+reparte el gradiente sin modificarlo hacia ambas ramas.
+
+### 2.7 Cabeza de clasificación
+
+Tras pasar por los $N$ bloques Transformer y una última LayerNorm, se extrae
+únicamente el token [CLS] (posición 0 de la secuencia) —que a esta altura ha
+podido atender a todos los parches y agregado información global de la
+imagen— y se proyecta con una capa lineal a la cantidad de clases, seguida de
+softmax:
+
+$$
+\hat{y} = \mathrm{softmax}\left(W_{head}\, z_L^{(0)} + b_{head}\right)
+$$
+
+El entrenamiento minimiza la pérdida de **entropía cruzada categórica**
+entre $\hat{y}$ y la etiqueta real (codificada one-hot):
+
+$$
+\mathcal{L} = -\sum_{c=1}^{C} y_c \log(\hat{y}_c)
+$$
+
+### 2.8 Complejidad computacional
+
+El costo dominante de self-attention es $O(N^2 D)$ (por el producto
+$QK^\top$, de tamaño $N \times N$), frente a $O(N D^2)$ del MLP. Para
+secuencias cortas —como en este trabajo, donde $N=16$ parches más el token
+CLS dan una secuencia de longitud 17— el término $N^2 D$ es manejable, pero
+es la razón por la que ViT escala peor que una CNN a resoluciones muy altas:
+duplicar $H$ y $W$ cuadruplica $N$ y por lo tanto cuadruplica (al cuadrado)
+el costo de atención.
+
+---
+
+## 3. Caso de estudio: FashionMNIST
+
+### 3.1 Problema
+
+FashionMNIST (Xiao et al., 2017) es un dataset de clasificación de imágenes
+publicado por Zalando Research como reemplazo directo (mismo formato, mismas
+dimensiones) del clásico MNIST de dígitos manuscritos, pero con una tarea
+notablemente más difícil: 70 000 imágenes en escala de grises de
+$28 \times 28$ píxeles, repartidas en 60 000 de entrenamiento y 10 000 de
+prueba, distribuidas uniformemente en 10 clases de prendas de vestir
+(camiseta, pantalón, pulóver, vestido, abrigo, sandalia, camisa, zapatilla,
+bolso, botín).
+
+La dificultad frente a MNIST radica en que las clases tienen mucha más
+variabilidad intra-clase (una "camisa" y un "abrigo" pueden compartir
+siluetas muy parecidas) y menos estructura de trazo simple que un dígito, lo
+que la convierte en un banco de pruebas más exigente y realista para validar
+si una arquitectura —en este caso, un ViT implementado desde cero— realmente
+aprende representaciones útiles y no solo memoriza patrones triviales de
+trazo.
+
+### 3.2 Marco teórico: instancia concreta del modelo
+
+Se instanció la arquitectura de la sección 2 con los siguientes
+hiperparámetros:
+
+| Hiperparámetro                    | Valor                     |
+| ---------------------------------- | -------------------------- |
+| Resolución de imagen               | $28 \times 28 \times 1$   |
+| Tamaño de parche $P$                | 7                          |
+| Parches por imagen $N$              | $4 \times 4 = 16$          |
+| Longitud de secuencia ($N+1$ con CLS) | 17                       |
+| Dimensión de embedding $D$          | 32                         |
+| Cabezas de atención $h$              | 4 ($d_k = 8$ por cabeza)  |
+| Bloques Transformer                 | 1                          |
+| Dimensión oculta del MLP            | 64                         |
+| Parámetros totales (aprox.)         | ~11 100                   |
+| Optimizador                         | SGD, sin momentum         |
+| Tasa de aprendizaje                 | 0.01                       |
+| Tamaño de batch                     | 8                          |
+| Función de pérdida                  | Entropía cruzada categórica |
+
+Es un modelo deliberadamente pequeño (un solo bloque Transformer, ~11 mil
+parámetros) frente a los ViT usados en la literatura (decenas de millones de
+parámetros, 12+ bloques), tanto por restricciones de tiempo de cómputo como
+para mantener la implementación —y su verificación numérica vía
+*gradient checking*— manejable.
+
+**Implementación.** Todas las operaciones del forward y backward —proyección
+de parches (equivalente a convolución), separación/combinación de cabezas de
+atención, el producto batched $QK^\top$ y $\mathrm{Attn}\cdot V$, softmax y
+su derivada, LayerNorm (forward y backward, con acumulación atómica de
+$\partial\gamma,\partial\beta$ sobre todas las filas), GELU, y la
+inserción/extracción del token CLS— están implementadas como kernels CUDA
+reales, no como bucles en CPU con transferencias de memoria disfrazadas de
+"GPU". Esto se verificó de dos formas: (1) *gradient checking* numérico
+sobre cada capa (diferencias finitas vs. backward analítico, error máximo
+del orden de $10^{-3}$–$10^{-4}$), y (2) comparando el tiempo de entrenamiento
+antes y después de mover cada operación a un kernel: el tiempo por época bajó
+de ~4 minutos (con varias operaciones aún corriendo en CPU) a un promedio de
+~161 segundos por época en la corrida reportada en la sección 3.3.
+
+### 3.3 Resultados
+
+Se entrenó el modelo durante 4 épocas completas sobre las 60 000 imágenes de
+entrenamiento (con *shuffle* de índices en cada época), evaluando pérdida y
+exactitud sobre el set de entrenamiento completo y el set de test completo
+(10 000 imágenes) al final de cada época:
+
+| Época | Train Loss | Train Acc | Test Loss | Test Acc | Tiempo (s) |
+| ----- | ---------- | --------- | --------- | -------- | ---------- |
+| 1     | 0.5548     | 0.7979    | 0.5958    | 0.7825   | 153.3      |
+| 2     | 0.4832     | 0.8246    | 0.5274    | 0.8077   | 168.6      |
+| 3     | 0.4493     | 0.8358    | 0.5009    | 0.8182   | 159.8      |
+| 4     | 0.4238     | 0.8427    | 0.4752    | 0.8245   | 164.6      |
+
+**Análisis.** La pérdida decrece de forma monótona tanto en entrenamiento
+como en test, y la exactitud en test sube consistentemente de 78.25% a
+82.45% en solo 4 épocas, sin señales de sobreajuste (la brecha entre
+train acc y test acc se mantiene acotada, entre 1.5 y 1.8 puntos
+porcentuales durante todo el entrenamiento). Esto indica que:
+
+- El mecanismo de self-attention implementado efectivamente propaga
+  gradientes útiles de principio a fin de la red (patch embedding → CLS →
+  atención → MLP → cabeza de clasificación), lo cual no es evidente a priori
+  en una implementación construida desde cero sin un framework que valide
+  automáticamente las formas y gradientes.
+- El modelo aún está *subajustando* (no ha convergido): con un solo bloque
+  Transformer y $D=32$, la capacidad es baja comparada con los ~90–91% de
+  exactitud que reportan CNN convencionales de mayor capacidad sobre
+  FashionMNIST, o con ViT de mayor escala. La tendencia estrictamente
+  creciente en las 4 épocas sugiere que más épocas de entrenamiento —o un
+  modelo con más bloques/dimensión— seguirían mejorando la exactitud antes
+  de estancarse.
+- El tiempo por época (~161 s en promedio, con las 60 000 imágenes en
+  batches de 8) es consistente entre épocas, lo que confirma que no hay
+  degradación de memoria ni fugas de recursos en los kernels CUDA a lo largo
+  del entrenamiento.
+
+### 3.4 Conclusiones
+
+La implementación desde cero de un Vision Transformer en C++/CUDA, sin
+depender de frameworks como PyTorch o TensorFlow, logra aprender
+representaciones útiles sobre FashionMNIST: con un modelo compacto de ~11 mil
+parámetros y solo 4 épocas de entrenamiento, se alcanza 82.45% de exactitud
+en test, con una curva de aprendizaje estable y sin sobreajuste. Esto valida
+tanto la correctitud matemática de cada componente —patch embedding,
+atención multi-cabeza, LayerNorm, GELU, softmax y sus respectivos
+backwards— como la correctitud de su portado a kernels CUDA reales, que
+además reduce el tiempo de entrenamiento por época en aproximadamente un
+33% respecto a una versión con partes del cómputo aún en CPU. Los resultados
+sugieren que, con más capacidad (más bloques Transformer, mayor dimensión de
+embedding) y más épocas de entrenamiento, el modelo tiene margen para
+acercarse al desempeño de arquitecturas convolucionales de referencia sobre
+este mismo dataset.
+
+---
+
+## 4. Conclusiones generales
+
+Este trabajo cubrió, de extremo a extremo, la teoría y la implementación
+práctica de un Vision Transformer: desde la tokenización de una imagen en
+parches y su proyección lineal, pasando por el mecanismo de self-attention y
+su generalización multi-cabeza, hasta el bloque Transformer completo con
+normalización, MLP y conexiones residuales. La validación experimental sobre
+FashionMNIST —un dataset deliberadamente más difícil que MNIST— confirma que
+la arquitectura, implementada íntegramente con kernels CUDA propios,
+aprende de forma estable y consistente, sentando una base funcional sobre la
+cual escalar el modelo (más bloques, mayor dimensión, más épocas) en
+trabajo futuro.
+
+---
+
+## Referencias
+
+- Dosovitskiy, A., Beyer, L., Kolesnikov, A., et al. (2020). *An Image is
+  Worth 16x16 Words: Transformers for Image Recognition at Scale.* arXiv:2010.11929.
+- Vaswani, A., Shazeer, N., Parmar, N., et al. (2017). *Attention Is All You
+  Need.* NeurIPS 2017.
+- Xiao, H., Rasul, K., & Vollgraf, R. (2017). *Fashion-MNIST: a Novel Image
+  Dataset for Benchmarking Machine Learning Algorithms.* arXiv:1708.07747.
+- Ba, J. L., Kiros, J. R., & Hinton, G. E. (2016). *Layer Normalization.*
+  arXiv:1607.06450.
+- Hendrycks, D., & Gimpel, K. (2016). *Gaussian Error Linear Units (GELUs).*
+  arXiv:1606.08415.

@@ -2,8 +2,6 @@
 
 #include "layers/Layer.hpp"
 
-#include <vector>
-
 // Normaliza cada token (ultimo eje) a media 0 / varianza 1, y aplica una
 // escala y un desplazamiento aprendibles (gamma, beta) por canal.
 // A diferencia de BatchNorm, la normalizacion es POR TOKEN, no por batch.
@@ -26,6 +24,6 @@ private:
   Tensor grad_beta_;
 
   // Cache del forward, necesario para el backward.
-  Tensor x_norm_;          // {rows, embed_dim}, rows = batch*tokens
-  std::vector<float> std_; // desviacion estandar por fila
+  Tensor x_norm_; // {rows, embed_dim}, rows = batch*tokens
+  Tensor std_;    // {rows}, desviacion estandar por fila
 };
