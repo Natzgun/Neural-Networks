@@ -60,16 +60,36 @@ __global__ void scalar_div_kernel(const float* A, float s, float* C, int n) {
     C[idx] = A[idx] / s;
 }
 
-__global__ void matmul_kernel(const float* A, const float* B, float* C, int M, int N, int K) {
-  int row = blockIdx.y * blockDim.y + threadIdx.y;
-  int col = blockIdx.x * blockDim.x + threadIdx.x;
+constexpr int MATMUL_TILE_SIZE = 16;
 
-  if (row < M && col < N) {
-    float sum = 0.0f;
-    for (int k = 0; k < K; k++)
-      sum += A[row * K + k] * B[k * N + col];
-    C[row * N + col] = sum;
+__global__ void matmul_tiled_kernel(const float* A, const float* B, float* C, int M, int N,
+                                    int K) {
+  __shared__ float tile_a[MATMUL_TILE_SIZE][MATMUL_TILE_SIZE];
+  __shared__ float tile_b[MATMUL_TILE_SIZE][MATMUL_TILE_SIZE];
+
+  int row = blockIdx.y * MATMUL_TILE_SIZE + threadIdx.y;
+  int col = blockIdx.x * MATMUL_TILE_SIZE + threadIdx.x;
+  float sum = 0.0f;
+
+  int tile_count = (K + MATMUL_TILE_SIZE - 1) / MATMUL_TILE_SIZE;
+  for (int tile = 0; tile < tile_count; ++tile) {
+    int a_col = tile * MATMUL_TILE_SIZE + threadIdx.x;
+    int b_row = tile * MATMUL_TILE_SIZE + threadIdx.y;
+
+    tile_a[threadIdx.y][threadIdx.x] =
+        row < M && a_col < K ? A[row * K + a_col] : 0.0f;
+    tile_b[threadIdx.y][threadIdx.x] =
+        b_row < K && col < N ? B[b_row * N + col] : 0.0f;
+    __syncthreads();
+
+#pragma unroll
+    for (int k = 0; k < MATMUL_TILE_SIZE; ++k)
+      sum += tile_a[threadIdx.y][k] * tile_b[k][threadIdx.x];
+    __syncthreads();
   }
+
+  if (row < M && col < N)
+    C[row * N + col] = sum;
 }
 
 __global__ void transpose_kernel(const float* in, float* out, int rows, int cols) {
@@ -191,9 +211,9 @@ Tensor matmul(const Tensor& a, const Tensor& b) {
   Tensor r({M, N});
   r.upload();
 
-  dim3 block(16, 16);
-  dim3 grid(div_ceil(N, 16), div_ceil(M, 16));
-  matmul_kernel<<<grid, block>>>(a.device_ptr(), b.device_ptr(), r.device_ptr(), M, N, K);
+  dim3 block(MATMUL_TILE_SIZE, MATMUL_TILE_SIZE);
+  dim3 grid(div_ceil(N, MATMUL_TILE_SIZE), div_ceil(M, MATMUL_TILE_SIZE));
+  matmul_tiled_kernel<<<grid, block>>>(a.device_ptr(), b.device_ptr(), r.device_ptr(), M, N, K);
   CUDA_CHECK(cudaGetLastError());
   CUDA_CHECK(cudaDeviceSynchronize());
   return r;

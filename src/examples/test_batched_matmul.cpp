@@ -23,6 +23,35 @@ void expect_close(float value, float target, float tol, const std::string& label
   }
 }
 
+void test_matmul_non_multiple_dimensions() {
+  constexpr int M = 3;
+  constexpr int K = 17;
+  constexpr int N = 5;
+
+  Tensor A({M, K});
+  Tensor B({K, N});
+  for (int i = 0; i < A.numel(); ++i)
+    A.flat(i) = static_cast<float>((i % 7) - 3) * 0.25f;
+  for (int i = 0; i < B.numel(); ++i)
+    B.flat(i) = static_cast<float>((i % 5) - 2) * 0.2f;
+  A.upload();
+  B.upload();
+
+  Tensor out = ops::matmul(A, B);
+  out.download();
+  expect_shape(out, {M, N}, "matmul tiled (dimensiones no multiplos)");
+
+  for (int row = 0; row < M; ++row) {
+    for (int col = 0; col < N; ++col) {
+      float expected = 0.0f;
+      for (int k = 0; k < K; ++k)
+        expected += A.at({row, k}) * B.at({k, col});
+      expect_close(out.at({row, col}), expected, 1e-4f, "matmul tiled vs CPU");
+    }
+  }
+  std::cout << "matmul tiled coincide con referencia CPU: OK\n";
+}
+
 // Extrae la sub-matriz 2D correspondiente a (b, h) de un tensor 4D
 // {batch, heads, rows, cols}, para comparar contra ops::matmul (ya probado).
 Tensor extract_slice(const Tensor& t, int b, int h) {
@@ -39,6 +68,8 @@ Tensor extract_slice(const Tensor& t, int b, int h) {
 } // namespace
 
 int main() {
+  test_matmul_non_multiple_dimensions();
+
   int batch = 2, heads = 2, M = 3, K = 4, N = 5;
 
   Tensor A = Tensor::random_uniform({batch, heads, M, K}, -1.0f, 1.0f);
