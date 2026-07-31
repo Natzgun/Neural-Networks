@@ -35,13 +35,14 @@ int run_cnn_training(int argc, char* argv[]) {
   std::cout << "Train: " << train.n_samples << ", Test: " << test.n_samples
             << ", channels: " << channels << ", classes: " << n_classes << "\n";
 
-  Network net = make_cnn(channels, n_classes);
-
   int epochs = 5;
   int batch_size = 8;
   float lr = 0.1f;
+  constexpr std::uint32_t seed = 42;
 
-  train_epochs(net, train, test, epochs, batch_size, lr);
+  Tensor::set_random_seed(seed);
+  Network net = make_cnn(channels, n_classes);
+  train_epochs(net, train, test, epochs, batch_size, lr, seed);
 
   return 0;
 }

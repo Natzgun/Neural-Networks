@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <filesystem>
 #include <iostream>
 #include <string>
 
@@ -38,12 +39,13 @@ int run_vit_training(int argc, char* argv[]) {
                              "datasets/fashionmnist/t10k-labels-idx1-ubyte");
   } else {
     std::cerr << "Unknown ViT dataset: " << dataset << "\n";
-    std::cerr << "Usage: neural_networks vit [fashionmnist|mnist] [epochs] [batch_size]\n";
+    std::cerr << "Usage: neural_networks vit [fashionmnist|mnist] [epochs] [batch_size] [seed]\n";
     return 1;
   }
 
   int epochs = parse_positive_int_arg(argc, argv, 2, 1, "epochs");
   int batch_size = parse_positive_int_arg(argc, argv, 3, 8, "batch_size");
+  int seed = parse_positive_int_arg(argc, argv, 4, 42, "seed");
   float lr = 0.01f;
 
   int image_h = 28;
@@ -64,11 +66,22 @@ int run_vit_training(int argc, char* argv[]) {
             << ", classes: " << n_classes << "\n";
   std::cout << "Config: patch_size=" << patch_size << ", embed_dim=" << embed_dim
             << ", heads=" << num_heads << ", layers=" << num_layers
-            << ", mlp_hidden=" << mlp_hidden_dim << "\n";
+            << ", mlp_hidden=" << mlp_hidden_dim << ", seed=" << seed << "\n";
 
+  Tensor::set_random_seed(static_cast<std::uint32_t>(seed));
   Network net = make_vit(image_h, image_w, patch_size, in_channels, embed_dim, num_heads,
                          mlp_hidden_dim, num_layers, n_classes);
 
-  train_epochs(net, train, test, epochs, batch_size, lr);
+  std::filesystem::path output_dir = std::filesystem::path("out") / "vit" / dataset;
+  std::filesystem::create_directories(output_dir);
+  std::filesystem::path metrics_path = output_dir / "metrics.csv";
+  std::filesystem::path predictions_path = output_dir / "predictions.csv";
+
+  train_epochs(net, train, test, epochs, batch_size, lr, static_cast<std::uint32_t>(seed),
+               metrics_path.string());
+  export_predictions(net, test, predictions_path.string());
+
+  std::cout << "Metrics: " << metrics_path << '\n';
+  std::cout << "Predictions: " << predictions_path << '\n';
   return 0;
 }

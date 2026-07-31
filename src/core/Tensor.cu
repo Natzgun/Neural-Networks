@@ -8,6 +8,13 @@
 #include <numeric>
 #include <random>
 
+namespace {
+std::mt19937& random_generator() {
+  static std::mt19937 generator(std::random_device{}());
+  return generator;
+}
+} // namespace
+
 Tensor::Tensor() {
   compute_strides();
 }
@@ -229,20 +236,22 @@ Tensor Tensor::ones(const std::vector<int>& shape) {
 
 Tensor Tensor::random_uniform(const std::vector<int>& shape, float lo, float hi) {
   Tensor t(shape);
-  std::mt19937 gen(std::random_device{}());
   std::uniform_real_distribution<float> dis(lo, hi);
   for (auto& x : t.data_)
-    x = dis(gen);
+    x = dis(random_generator());
   return t;
 }
 
 Tensor Tensor::random_normal(const std::vector<int>& shape, float mean, float std) {
   Tensor t(shape);
-  std::mt19937 gen(std::random_device{}());
   std::normal_distribution<float> dis(mean, std);
   for (auto& x : t.data_)
-    x = dis(gen);
+    x = dis(random_generator());
   return t;
+}
+
+void Tensor::set_random_seed(std::uint32_t seed) {
+  random_generator().seed(seed);
 }
 
 void Tensor::print(const std::string& name) const {

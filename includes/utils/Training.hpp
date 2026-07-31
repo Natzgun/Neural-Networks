@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
 #include <vector>
 
 #include "data/Dataset.hpp"
@@ -15,5 +17,7 @@ Dataset build_batch(const Dataset& ds, const std::vector<int>& indices, int star
 
 Metrics evaluate(Network& net, const Dataset& ds);
 
-void train_epochs(Network& net, Dataset& train, Dataset& test, int epochs, int batch_size,
-                  float lr);
+void train_epochs(Network& net, Dataset& train, Dataset& test, int epochs, int batch_size, float lr,
+                  std::uint32_t seed = 42, const std::string& metrics_path = "");
+
+void export_predictions(Network& net, const Dataset& ds, const std::string& output_path);

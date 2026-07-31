@@ -1,15 +1,54 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <numeric>
 #include <random>
+#include <stdexcept>
 #include <vector>
 
 #include "core/Tensor.cuh"
 #include "data/Dataset.hpp"
 #include "network/Network.hpp"
 #include "utils/Training.hpp"
+
+namespace {
+constexpr int kImageHeight = 28;
+constexpr int kImageWidth = 28;
+constexpr int kEvaluationBatchSize = 1000;
+
+int argmax_row(const Tensor& tensor, int row, int columns) {
+  int result = 0;
+  for (int column = 1; column < columns; ++column)
+    if (tensor.at({row, column}) > tensor.at({row, result}))
+      result = column;
+  return result;
+}
+
+template <typename Consumer>
+void for_each_prediction_batch(Network& net, const Dataset& ds, Consumer consume) {
+  int n = ds.n_samples;
+  int features = ds.X.numel() / n;
+  int channels = features / (kImageHeight * kImageWidth);
+
+  for (int start = 0; start < n; start += kEvaluationBatchSize) {
+    int end = std::min(start + kEvaluationBatchSize, n);
+    int current = end - start;
+
+    Tensor x({current, features});
+    for (int i = 0; i < current; ++i)
+      for (int j = 0; j < features; ++j)
+        x.flat(i * features + j) = ds.X.flat((start + i) * features + j);
+    x.upload();
+
+    Tensor pred = net.forward(x.reshape({current, channels, kImageHeight, kImageWidth}));
+    pred.download();
+    consume(start, current, pred);
+  }
+}
+} // namespace
 
 Dataset build_batch(const Dataset& ds, const std::vector<int>& indices, int start, int batch_size) {
   int n = ds.n_samples;
@@ -33,10 +72,10 @@ Dataset build_batch(const Dataset& ds, const std::vector<int>& indices, int star
   X.upload();
   Y.upload();
 
-  int channels = features / (28 * 28);
+  int channels = features / (kImageHeight * kImageWidth);
 
   Dataset batch;
-  batch.X = X.reshape({current, channels, 28, 28});
+  batch.X = X.reshape({current, channels, kImageHeight, kImageWidth});
   batch.Y = std::move(Y);
   batch.n_samples = current;
   return batch;
@@ -45,9 +84,6 @@ Dataset build_batch(const Dataset& ds, const std::vector<int>& indices, int star
 Metrics evaluate(Network& net, const Dataset& ds) {
   int n = ds.n_samples;
   int n_classes = ds.Y.dim(1);
-  int eval_batch = 1000;
-  int features = ds.X.numel() / n;
-  int channels = features / (28 * 28);
   const float eps = 1e-9f;
 
   Tensor labels = ds.Y;
@@ -55,68 +91,98 @@ Metrics evaluate(Network& net, const Dataset& ds) {
 
   int correct = 0;
   float total_loss = 0.0f;
-  for (int start = 0; start < n; start += eval_batch) {
-    int end = std::min(start + eval_batch, n);
-    int current = end - start;
-
-    Tensor x({current, features});
-    for (int i = 0; i < current; ++i)
-      for (int j = 0; j < features; ++j)
-        x.flat(i * features + j) = ds.X.flat((start + i) * features + j);
-    x.upload();
-
-    Tensor pred = net.forward(x.reshape({current, channels, 28, 28}));
-    pred.download();
-
+  for_each_prediction_batch(net, ds, [&](int start, int current, const Tensor& pred) {
     for (int i = 0; i < current; ++i) {
-      int pred_class = 0;
-      int true_class = 0;
-      for (int j = 1; j < n_classes; ++j) {
-        if (pred.at({i, j}) > pred.at({i, pred_class}))
-          pred_class = j;
-        if (labels.at({start + i, j}) > labels.at({start + i, true_class}))
-          true_class = j;
-      }
+      int pred_class = argmax_row(pred, i, n_classes);
+      int true_class = argmax_row(labels, start + i, n_classes);
       if (pred_class == true_class)
         ++correct;
 
-      for (int j = 0; j < n_classes; ++j) {
-        if (labels.at({start + i, j}) > 0.5f)
-          total_loss -= std::log(pred.at({i, j}) + eps);
-      }
+      total_loss -= std::log(pred.at({i, true_class}) + eps);
     }
-  }
+  });
 
-  Metrics m;
-  m.accuracy = static_cast<float>(correct) / n;
-  m.loss = total_loss / n;
-  return m;
+  Metrics metrics;
+  metrics.accuracy = static_cast<float>(correct) / n;
+  metrics.loss = total_loss / n;
+  return metrics;
 }
 
-void train_epochs(Network& net, Dataset& train, Dataset& test, int epochs, int batch_size,
-                  float lr) {
+void train_epochs(Network& net, Dataset& train, Dataset& test, int epochs, int batch_size, float lr,
+                  std::uint32_t seed, const std::string& metrics_path) {
   int n = train.n_samples;
   std::vector<int> indices(n);
   std::iota(indices.begin(), indices.end(), 0);
-  std::mt19937 gen(std::random_device{}());
+  std::mt19937 generator(seed);
 
-  for (int e = 0; e < epochs; ++e) {
-    auto t0 = std::chrono::steady_clock::now();
-    std::shuffle(indices.begin(), indices.end(), gen);
+  std::ofstream metrics_file;
+  if (!metrics_path.empty()) {
+    metrics_file.open(metrics_path);
+    if (!metrics_file)
+      throw std::runtime_error("Failed to open metrics file: " + metrics_path);
+    metrics_file << "epoch,seed,train_loss,train_accuracy,test_loss,test_accuracy,time_ms\n";
+    metrics_file << std::fixed << std::setprecision(6);
+  }
+
+  for (int epoch = 0; epoch < epochs; ++epoch) {
+    auto start_time = std::chrono::steady_clock::now();
+    std::shuffle(indices.begin(), indices.end(), generator);
 
     for (int start = 0; start < n; start += batch_size) {
       Dataset batch = build_batch(train, indices, start, batch_size);
       net.train_step(batch.X, batch.Y, lr);
     }
 
-    Metrics train_m = evaluate(net, train);
-    Metrics test_m = evaluate(net, test);
+    Metrics train_metrics = evaluate(net, train);
+    Metrics test_metrics = evaluate(net, test);
 
-    auto t1 = std::chrono::steady_clock::now();
-    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+    auto end_time = std::chrono::steady_clock::now();
+    auto elapsed_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 
-    std::cout << "Epoch " << e + 1 << "/" << epochs << " | train loss: " << train_m.loss
-              << " | train acc: " << train_m.accuracy << " | test loss: " << test_m.loss
-              << " | test acc: " << test_m.accuracy << " | time: " << ms << "ms\n";
+    std::cout << "Epoch " << epoch + 1 << "/" << epochs << " | train loss: " << train_metrics.loss
+              << " | train acc: " << train_metrics.accuracy << " | test loss: " << test_metrics.loss
+              << " | test acc: " << test_metrics.accuracy << " | time: " << elapsed_ms << "ms\n";
+
+    if (metrics_file) {
+      metrics_file << epoch + 1 << ',' << seed << ',' << train_metrics.loss << ','
+                   << train_metrics.accuracy << ',' << test_metrics.loss << ','
+                   << test_metrics.accuracy << ',' << elapsed_ms << '\n';
+      metrics_file.flush();
+      if (!metrics_file)
+        throw std::runtime_error("Failed to write metrics file: " + metrics_path);
+    }
   }
+}
+
+void export_predictions(Network& net, const Dataset& ds, const std::string& output_path) {
+  std::ofstream output(output_path);
+  if (!output)
+    throw std::runtime_error("Failed to open predictions file: " + output_path);
+
+  int n_classes = ds.Y.dim(1);
+  output << "index,true_label,predicted_label,confidence";
+  for (int class_index = 0; class_index < n_classes; ++class_index)
+    output << ",prob_" << class_index;
+  output << '\n' << std::fixed << std::setprecision(6);
+
+  Tensor labels = ds.Y;
+  labels.download();
+
+  for_each_prediction_batch(net, ds, [&](int start, int current, const Tensor& pred) {
+    for (int i = 0; i < current; ++i) {
+      int predicted_label = argmax_row(pred, i, n_classes);
+      int true_label = argmax_row(labels, start + i, n_classes);
+
+      output << start + i << ',' << true_label << ',' << predicted_label << ','
+             << pred.at({i, predicted_label});
+      for (int class_index = 0; class_index < n_classes; ++class_index)
+        output << ',' << pred.at({i, class_index});
+      output << '\n';
+    }
+  });
+
+  output.flush();
+  if (!output)
+    throw std::runtime_error("Failed to write predictions file: " + output_path);
 }

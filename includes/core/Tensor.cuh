@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <initializer_list>
 #include <string>
 #include <vector>
@@ -55,6 +56,7 @@ public:
   static Tensor ones(const std::vector<int>& shape);
   static Tensor random_uniform(const std::vector<int>& shape, float lo, float hi);
   static Tensor random_normal(const std::vector<int>& shape, float mean, float std);
+  static void set_random_seed(std::uint32_t seed);
 
   void print(const std::string& name = "") const;
 

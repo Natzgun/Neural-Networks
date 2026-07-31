@@ -156,3 +156,17 @@ target_include_directories(test_vit PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/core
 )
+
+add_executable(test_training_artifacts
+    ${CORE_SOURCES}
+    ${LAYER_SOURCES}
+    ${NETWORK_SOURCES}
+    ${UTIL_SOURCES}
+    src/examples/test_training_artifacts.cpp
+)
+
+target_include_directories(test_training_artifacts PRIVATE
+    ${CMAKE_SOURCE_DIR}/includes
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/core
+)
